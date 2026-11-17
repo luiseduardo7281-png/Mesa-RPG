@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mesa de RPG</title>
+<style>
+[hidden]{display:none!important}
+:root{--bg:#f4f1ea;--panel:#fffdf8;--ink:#2a2622;--mut:#6f675d;--line:#d9d2c4;--map:#e9e2d0;--grid:#c9bfa6;--acc:#8a3b2a}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#1b1916;--panel:#26231f;--ink:#efe9dc;--mut:#a59d8e;--line:#3a352e;--map:#2e2a23;--grid:#463f34;--acc:#d9805f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 Georgia,'Times New Roman',serif}
+header{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+h1{font-size:18px;margin:0}#st,#who{color:var(--mut);font-size:13px}
+main{display:grid;grid-template-columns:1fr 350px;gap:12px;padding:12px;align-items:start}
+@media (max-width:820px){main{grid-template-columns:1fr}}
+#wrap{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+canvas{display:block;width:100%;touch-action:none;background:var(--map)}
+aside{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;max-height:calc(100vh - 80px);overflow:auto}
+@media (max-width:820px){aside{max-height:none}}
+h2{font-size:14px;margin:12px 0 6px;color:var(--acc);text-transform:uppercase;letter-spacing:.06em}
+button{font:inherit;background:var(--acc);color:#fff;border:0;border-radius:6px;padding:5px 9px;cursor:pointer}
+button.g{background:transparent;color:var(--ink);border:1px solid var(--line)}
+input,select,textarea{font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0}
+input.w,textarea{width:100%}textarea{min-height:110px;font-size:13px}
+.row{display:flex;gap:6px;margin:6px 0;align-items:center;flex-wrap:wrap}
+.sw{width:22px;height:22px;border-radius:50%;border:2px solid transparent;padding:0}.sw.on{border-color:var(--ink)}
+.pip{width:26px;height:14px;border:2px solid var(--line);border-radius:7px;background:transparent;padding:0}.pip.on{background:var(--acc);border-color:var(--acc)}
+.sk{display:grid;grid-template-columns:1fr 54px 52px 46px;gap:4px;align-items:center;font-size:13px;padding:2px 0;border-bottom:1px dotted var(--line)}
+.sk small{color:var(--mut)}.sk button{padding:2px 6px;font-size:12px}
+#log div{font-size:13px;padding:3px 0;border-bottom:1px dotted var(--line)}
+.ok{color:#2e7d32;font-weight:bold}.bad{color:#c62828;font-weight:bold}
+p.h{color:var(--mut);font-size:13px}
+#login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9}
+#login form{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;width:min(340px,92vw)}
+#login input{width:100%;margin:6px 0}#err{color:#c62828;font-size:13px;min-height:18px}
+</style>
+</head>
+<body>
+<div id="login"><form id="lf"><h1>Mesa de RPG</h1>
+<p class="h">Entre com seu nome. Mestre: informe também a senha.</p>
+<input id="ln" placeholder="Seu nome" maxlength="20" required>
+<input id="lp" type="password" placeholder="Senha de mestre (opcional)">
+<div id="err"></div><button style="width:100%">Entrar</button></form></div>
+<header><h1>Mesa de RPG</h1><span id="st">Conectando…</span><span id="who"></span></header>
+<main>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<aside>
+<div class="row" id="gmbar" hidden><button id="add">+ Novo token</button><button class="g" id="mapb">Mapa…</button><button class="g" id="mapx">Limpar mapa</button></div>
+<input type="file" id="file" accept="image/*" hidden>
+<div id="sel"></div>
+<h2>Rolagens</h2><div id="log"><p class="h">Nenhuma rolagem ainda.</p></div>
+</aside>
+</main>
+<script>
+const COLS=22,ROWS=14,CELL=40,W=COLS*CELL,H=ROWS*CELL;
+const COLORS=['#b5483a','#3f7cac','#4f8a5b','#c79a2b','#7a5aa6','#555555'];
+const FACES=[4,6,8,10,12,20],ATN=['Físico','Mente','Emoção'];
+const SK=[['Acrobacia',0],['Animais',2],['Aptidão (Erudição)',1],['Aptidão (Guerra)',1],['Aptidão (Nobreza)',1],['Atletismo',0],['Bruxaria',1],['Crime',0],['Disciplina',2],['Enganação',2],['Furtividade',0],['Inspecionar',1],['Intimidar',2],['Intuição',2],['Luta',0],['Medicina',1],['Ofício',1],['Percepção',1],['Persuasão',2],['Pontaria',0],['Sobrevivência',1],['Vigor',0]];
+const $=id=>document.getElementById(id);
+const cv=$('cv'),ctx=cv.getContext('2d');cv.width=W;cv.height=H;
+let ws=null,me=null,tokens=[],mapImg=null,sel=null,drag=null,dt=7,step=0,extra=0,lastMove=0,joined=null;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,Math.trunc(+v)||0));
+const tx=m=>ws&&ws.readyState===1&&ws.send(JSON.stringify(m));
+const cur=()=>tokens.find(k=>k.id===sel);
+const can=t=>t&&me&&(me.gm||(t.o&&t.o===me.name));
+const busy=()=>{const a=document.activeElement;return a&&$('sel').contains(a)&&/INPUT|TEXTAREA/.test(a.tagName)};
+
+function connect(){
+  ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
+  ws.onopen=()=>{$('st').textContent='Conectado';if(joined)tx({t:'join',...joined})};
+  ws.onclose=()=>{$('st').textContent='Desconectado – reconectando…';setTimeout(connect,2000)};
+  ws.onmessage=e=>{const m=JSON.parse(e.data);
+    if(m.t==='error'){joined=null;me=null;$('login').hidden=false;$('err').textContent=m.msg;return}
+    if(m.t==='init'){me=m.me;$('login').hidden=true;$('gmbar').hidden=!me.gm;tokens=m.tokens;setMap(m.map);
+      $('log').innerHTML='';m.log.slice().reverse().forEach(logRoll);if(!m.log.length)$('log').innerHTML='<p class="h">Nenhuma rolagem ainda.</p>';
+      if(!sel&&tokens.length)sel=(tokens.find(t=>t.o===me.name)||tokens[0]).id;panel();draw()}
+    else if(m.t==='state'){const dl=drag&&tokens.find(k=>k.id===drag);const keep=dl&&{x:dl.x,y:dl.y};
+      tokens=m.tokens;if(keep){const t=tokens.find(k=>k.id===drag);if(t){t.x=keep.x;t.y=keep.y}}
+      if(!tokens.some(t=>t.id===sel))sel=null;busy()?vitals():panel();draw()}
+    else if(m.t==='map')setMap(m.data);
+    else if(m.t==='roll')logRoll(m.r);
+    else if(m.t==='who')$('who').textContent='Na mesa: '+m.list.join(', ');
+  };
+}
+$('lf').onsubmit=e=>{e.preventDefault();joined={name:$('ln').value,pw:$('lp').value};$('err').textContent='';tx({t:'join',...joined})};
+try{const s=JSON.parse(localStorage.getItem('mesa-login')||'{}');if(s.n)$('ln').value=s.n}catch(e){}
+$('lf').addEventListener('submit',()=>{try{localStorage.setItem('mesa-login',JSON.stringify({n:$('ln').value}))}catch(e){}});
+
+function setMap(d){if(!d){mapImg=null;draw();return}const im=new Image();im.onload=()=>{mapImg=im;draw()};im.src=d}
+function draw(){
+  const cs=getComputedStyle(document.documentElement);
+  ctx.fillStyle=cs.getPropertyValue('--map');ctx.fillRect(0,0,W,H);
+  if(mapImg)ctx.drawImage(mapImg,0,0,W,H);
+  ctx.strokeStyle=cs.getPropertyValue('--grid');ctx.lineWidth=1;ctx.globalAlpha=mapImg?.5:1;ctx.beginPath();
+  for(let i=0;i<=COLS;i++){ctx.moveTo(i*CELL+.5,0);ctx.lineTo(i*CELL+.5,H)}
+  for(let j=0;j<=ROWS;j++){ctx.moveTo(0,j*CELL+.5);ctx.lineTo(W,j*CELL+.5)}
+  ctx.stroke();ctx.globalAlpha=1;
+  for(const t of tokens){
+    const cx=t.x*CELL+CELL/2,cy=t.y*CELL+CELL/2,r=CELL*.42;
+    ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.fillStyle=t.c;ctx.fill();
+    ctx.lineWidth=t.id===sel?4:2;ctx.strokeStyle=t.id===sel?'#fff':'rgba(0,0,0,.45)';ctx.stroke();
+    ctx.fillStyle='#fff';ctx.font='bold 16px Georgia';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText((t.n[0]||'?').toUpperCase(),cx,cy);
+    const bw=CELL*.8,bx=cx-bw/2,by=cy+r+2,p=Math.max(0,t.hp/t.max);
+    ctx.fillStyle='rgba(0,0,0,.5)';ctx.fillRect(bx,by,bw,5);
+    ctx.fillStyle=p>.5?'#4caf50':p>.25?'#e0a800':'#d33';ctx.fillRect(bx,by,bw*p,5);
+  }
+}
+const pos=e=>{const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}};
+const hit=p=>{for(let i=tokens.length-1;i>=0;i--){const t=tokens[i];if(Math.hypot(p.x-(t.x*CELL+CELL/2),p.y-(t.y*CELL+CELL/2))<CELL*.45)return t}return null};
+cv.addEventListener('pointerdown',e=>{const t=hit(pos(e));sel=t?t.id:null;drag=t&&can(t)?t.id:null;if(drag)cv.setPointerCapture(e.pointerId);panel();draw()});
+cv.addEventListener('pointermove',e=>{if(!drag)return;const t=tokens.find(k=>k.id===drag),p=pos(e);if(!t)return;
+  const nx=clamp(Math.floor(p.x/CELL),0,COLS-1),ny=clamp(Math.floor(p.y/CELL),0,ROWS-1);
+  if(nx!==t.x||ny!==t.y){t.x=nx;t.y=ny;draw();const n=Date.now();if(n-lastMove>60){lastMove=n;tx({t:'move',id:t.id,x:nx,y:ny})}}});
+cv.addEventListener('pointerup',()=>{const t=drag&&tokens.find(k=>k.id===drag);drag=null;if(t)tx({t:'move',id:t.id,x:t.x,y:t.y})});
+
+const opts=(a,v)=>a.map(d=>`<option value="${d}"${d===v?' selected':''}>d${d}</option>`).join('');
+function panel(){
+  const box=$('sel'),t=cur();
+  if(!t){box.innerHTML='<p class="h">Clique num token para abrir a ficha. Arraste para mover.</p>';return}
+  const s=t.s,ro=can(t)?'':' disabled';
+  box.innerHTML=`<div class="row"><input class="w" id="nm" maxlength="24" placeholder="Nome"${ro}></div>
+  ${me.gm?`<div class="row"><span>Jogador:</span><input id="ow" maxlength="20" placeholder="nome do jogador" style="flex:1"></div>`:`<p class="h">${t.o?'Jogador: '+t.o:'Sem jogador'}</p>`}
+  <div class="row"><input class="w" id="cl" maxlength="60" placeholder="Classe · Origem" style="flex:1"${ro}><span>Nv</span><input id="lv" type="number" min="1" max="20" style="width:52px"${ro}></div>
+  <h2>Atributos</h2><div class="row">${ATN.map((a,i)=>`${a} <select data-at="${i}"${ro}>${opts(FACES,s.at[i])}</select>`).join(' ')}</div>
+  <h2>Vida e Pontos</h2>
+  <div class="row"><b>PV</b><button class="g" data-hp="-5"${ro}>−5</button><button class="g" data-hp="-1"${ro}>−1</button><b id="hp" style="flex:1;text-align:center"></b><button class="g" data-hp="1"${ro}>+1</button><button class="g" data-hp="5"${ro}>+5</button></div>
+  <div class="row"><b>PD</b><button class="g" data-pd="-1"${ro}>−1</button><b id="pd" style="flex:1;text-align:center"></b><button class="g" data-pd="1"${ro}>+1</button><span>máx</span><input id="pdm" type="number" min="0" style="width:56px"${ro}><span>PV máx</span><input id="pvm" type="number" min="1" style="width:56px"${ro}></div>
+  <div class="row"><b>Ímpeto</b><span id="im" class="row" style="margin:0"></span></div>
+  <h2>Perícias</h2>
+  <div class="row">DT <input id="dt" type="number" min="1" style="width:52px"> Passo <select id="step">${[-2,-1,0,1,2].map(v=>`<option value="${v}"${v===step?' selected':''}>${v>0?'+'+v:v}</option>`).join('')}</select> Dados extras <select id="ex">${[0,1,2].map(v=>`<option${v===extra?' selected':''}>${v}</option>`).join('')}</select></div>
+  <div id="sks"></div><h2>Habilidades e equipamento</h2><textarea id="nt" maxlength="1500"${ro}></textarea>
+  <div class="row" id="cols"></div>${me.gm?'<div class="row"><button class="g" id="del">Remover token</button></div>':''}`;
+  $('nm').value=t.n;$('cl').value=s.cl;$('lv').value=s.lv;$('pdm').value=s.pd[1];$('pvm').value=t.max;$('nt').value=s.nt;$('dt').value=dt;
+  if(me.gm)$('ow').value=t.o||'';
+  vitals();
+  $('sks').innerHTML=SK.map((k,i)=>`<div class="sk"><span>${k[0]}<br><small>${ATN[k[1]]}</small></span><select data-sk="${i}"${ro}>${opts(FACES,s.k[i])}</select><small>+ d${s.at[k[1]]}</small><button data-roll="${i}"${ro}>Rolar</button></div>`).join('');
+  if(can(t))COLORS.forEach(c=>{const b=document.createElement('button');b.className='sw'+(c===t.c?' on':'');b.style.background=c;b.dataset.col=c;$('cols').append(b)});
+}
+function vitals(){const t=cur();if(!t||!$('hp'))return;const ro=can(t)?'':' disabled';
+  $('hp').textContent=t.hp+' / '+t.max;$('pd').textContent=t.s.pd[0]+' / '+t.s.pd[1];
+  $('im').innerHTML=[0,1,2,3,4].map(i=>`<button class="pip${i<t.s.im?' on':''}" data-im="${i}"${ro}></button>`).join('')}
+let ft=null;const patch=(t,f,now)=>{clearTimeout(ft);const go=()=>tx({t:'patch',id:t.id,f});now?go():ft=setTimeout(go,350)};
+$('sel').addEventListener('input',e=>{const t=cur();if(!t)return;const id=e.target.id,v=e.target.value;
+  if(id==='dt'){dt=clamp(v,1,99);return}
+  if(id==='ow'){tx({t:'owner',id:t.id,o:v});return}
+  if(!can(t))return;
+  if(id==='nm'){t.n=v;draw();patch(t,{n:v})}
+  else if(id==='cl'){t.s.cl=v;patch(t,{s:t.s})}else if(id==='nt'){t.s.nt=v;patch(t,{s:t.s})}
+  else if(id==='lv'){t.s.lv=clamp(v,1,20);patch(t,{s:t.s})}
+  else if(id==='pdm'){t.s.pd[1]=clamp(v,0,999);t.s.pd[0]=Math.min(t.s.pd[0],t.s.pd[1]);vitals();patch(t,{s:t.s})}
+  else if(id==='pvm'){t.max=Math.max(1,clamp(v,1,999));t.hp=Math.min(t.hp,t.max);vitals();draw();patch(t,{max:t.max,hp:t.hp})}});
+$('sel').addEventListener('change',e=>{const t=cur();if(!t)return;const d=e.target.dataset;
+  if(e.target.id==='step'){step=+e.target.value;return}if(e.target.id==='ex'){extra=+e.target.value;return}
+  if(!can(t))return;
+  if(d.at!==undefined){t.s.at[+d.at]=+e.target.value;panel();patch(t,{s:t.s},1)}
+  else if(d.sk!==undefined){t.s.k[+d.sk]=+e.target.value;patch(t,{s:t.s},1)}});
+$('sel').addEventListener('click',e=>{const t=cur(),b=e.target.closest('button');if(!t||!b)return;const d=b.dataset;
+  if(d.roll!==undefined){tx({t:'roll',id:t.id,i:+d.roll,dt,step,extra});return}
+  if(b.id==='del'){tx({t:'del',id:t.id});sel=null;return}
+  if(!can(t))return;
+  if(d.hp){t.hp=clamp(t.hp+ +d.hp,0,t.max);vitals();draw();patch(t,{hp:t.hp},1)}
+  else if(d.pd){t.s.pd[0]=clamp(t.s.pd[0]+ +d.pd,0,t.s.pd[1]);vitals();patch(t,{s:t.s},1)}
+  else if(d.im!==undefined){const i=+d.im;t.s.im=t.s.im===i+1?i:i+1;vitals();patch(t,{s:t.s},1)}
+  else if(d.col){t.c=d.col;panel();draw();patch(t,{c:d.col},1)}});
+$('add').onclick=()=>tx({t:'add'});
+$('mapb').onclick=()=>$('file').click();$('mapx').onclick=()=>tx({t:'map',data:null});
+$('file').onchange=()=>{const f=$('file').files[0];if(!f)return;const im=new Image();
+  im.onload=()=>{const k=Math.min(1,1600/Math.max(im.width,im.height)),c=document.createElement('canvas');
+    c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+    tx({t:'map',data:c.toDataURL('image/jpeg',.82)})};im.src=URL.createObjectURL(f);$('file').value=''};
+
+function logRoll(r){
+  const l=$('log');if(l.querySelector('p'))l.innerHTML='';
+  const x=document.createElement('div');
+  x.append(`${r.n} (${r.by}) · ${r.p}: `+r.dice.map(d=>`d${d.f}(${d.v})`).join(' + ')+` = ${r.total} `);
+  const s=document.createElement('span');
+  s.className=r.ok?'ok':'bad';
+  s.textContent=(r.crit==='s'?'SUCESSO CRÍTICO':r.crit==='f'?'FALHA CRÍTICA (+1 ímpeto)':r.ok?'sucesso':'falha (+1 ímpeto)')+` · DT ${r.dt} · RA ${r.ra} RB ${r.rb}`;
+  x.append(s);l.prepend(x);while(l.children.length>30)l.lastChild.remove()}
+connect();
+</script>
+</body>
+</html>
