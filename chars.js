@@ -1,0 +1,56 @@
+// Personagens prontos (fichas do playtest) – dados lidos das fichas em PDF.
+const STD=['Acrobacia','Animais','Aptidão','Atletismo','Bruxaria','Crime','Disciplina','Enganação','Furtividade','Inspecionar','Intimidar','Intuição','Luta','Medicina','Ofício','Percepção','Persuasão','Pontaria','Sobrevivência','Vigor'];
+const mk=(d,ren={})=>STD.map((n,i)=>({n:ren[n]||n,d:d[i]}));
+const CORE={
+ executor:{n:'Ímpeto',t:'Você possui uma barra de ímpeto, com cinco espaços. Sempre que faz um teste e falha, você preenche um espaço na barra de ímpeto. Como uma ação livre, você pode gastar espaços da barra de ímpeto para receber benefícios.\n• 1 espaço: você recebe +d4 em um teste.\n• 3 espaços: você aumenta um atributo em um passo até o fim da cena.\n• 3 espaços: em cenas de conflito, você faz uma ação extra.\nNo fim da cena, sua barra de ímpeto esvazia.'},
+ vigilante:{n:'Prontidão',t:'Uma vez por rodada, quando você ou outro ser em alcance curto faz um teste, você pode gastar 2 PD para rolar novamente, ou para fazer o outro ser rolar novamente, um dos dados do teste cujo resultado não tenha sido 1.\nAlém disso, em combates, você pode fazer sua ação na fase dela ou em fases posteriores, e após qualquer ação daquela fase já ter sido rolada.'},
+ analista:{n:'Análise',t:'Você pode gastar uma ação para receber 2 marcadores de análise.\n• Quando faz um teste, pode gastar quantos marcadores quiser após rolar os dados. Para cada marcador gasto, pode mudar o resultado de um dado em +1 ou –1 (até o máximo do dado).\n• Você pode acumular no máximo 4 marcadores de análise e, no fim da cena, perde quaisquer marcadores não usados.'}
+};
+const rel=(n,p,l,t)=>({n,p,l,t});
+const P=(o)=>({cl:'executor',or:'',lv:3,ag:0,ds:'',at:[6,6,6],up:[0,0,0],sk:[],pd:[10,10],im:0,an:0,ar:0,ab:[],eq:[],rl:[],bio:'',...o});
+function presets(){
+ const T=[
+ {id:'t1',n:'Cormac',sub:'Coluim',x:3,y:4,hp:17,max:17,c:'#b5483a',o:'',s:P({cl:'executor',or:'Aristocrata',at:[8,8,6],pd:[15,15],ar:2,
+  sk:(()=>{const a=mk([4,4,6,6,4,4,8,4,6,6,4,4,8,4,6,6,6,4,4,8]);a.splice(2,1,{n:'Aptidão (Erudição)',d:6},{n:'Aptidão (Guerra)',d:6},{n:'Aptidão (Nobreza)',d:6});return a})(),
+  ab:[CORE.executor,{n:'Herança',t:'Sua categoria de riqueza aumenta em 1*.\n*As regras de compra de itens serão apresentadas futuramente. Na prática, por hora isso significa que Cormac começa com itens melhores.'},{n:'Plano Estratégico',t:'Você pode gastar uma ação e 3 PD para elaborar um plano de ação. Faça um teste de Aptidão (Guerra) contra DT 7. Se passar, você e os seus aliados recebem d6, +d6 para cada 3 pontos pelos quais o resultado do teste exceder a DT, que podem gastar em quaisquer testes até o fim da cena.'}],
+  eq:[{n:'Espada forjada em castelo',k:'c',dm:'RA+3',t:'Quando ataca com ela, você consegue um sucesso crítico com dois valores 5 ou mais.'},{n:'Cota de malha',k:'i',dm:'',t:'Fornece 2 pontos de armadura, mas reduz Furtividade em 1 passo.'}]})},
+ {id:'t2',n:'Rhiona',sub:'Mac Tuirenn',x:5,y:6,hp:22,max:22,c:'#c79a2b',o:'',s:P({cl:'analista',or:'Ferreira',ag:23,at:[10,6,6],pd:[12,12],
+  ds:'Filha do ferreiro, detém o raro conhecimento da metalurgia e prestígio na comunidade.',
+  sk:mk([4,4,4,8,4,4,6,4,4,4,4,4,10,4,8,6,6,4,4,8],{Ofício:'Ofício (Metalurgia)'}),
+  ab:[CORE.analista,{n:'Leitura de Combate',t:'Em combate, sempre que você gastar uma ação para se defender, você recebe um marcador de análise.'},{n:'Segredo do Aço',t:'Você sabe usar equipamentos marciais. Além disso, se estiver vestindo um item que forneça pontos de armadura, o item fornece 1 ponto de armadura adicional.'}],
+  eq:[{n:'Martelo de forja',k:'c',dm:'RA+3',t:'Arma corpo a corpo.'},{n:'Tenaz de ferreiro',k:'i',dm:'',t:''}],
+  rl:[rel('ROWAN',1,'CONFIANÇA','É quem lhe traz o minério de ferro do pântano.'),rel('MUIRENN',0,'NEUTRO','Soube de enfermos que foram tratados pela curandeira.'),rel('CAVAN',2,'AMIZADE','Passam horas debatendo contabilidade.'),rel('MALIK',1,'ADMIRAÇÃO','Gosta de ouvir as histórias que ele traz de terras distantes.'),rel('SIRA',0,'NEUTRO','Aguarda ela se recuperar do naufrágio para fazer perguntas.'),rel('SORCHA',1,'RESPEITO','Reconhece a importância de sua vigilância.'),rel('CORMAC',1,'CURIOSIDADE','Pergunta-se de onde vem a espada que carrega.')]})},
+ {id:'t3',n:'Rowan',sub:'Lobo Castanho',x:7,y:4,hp:20,max:20,c:'#4f8a5b',o:'',s:P({cl:'vigilante',or:'Adestrador',ag:25,at:[8,8,6],pd:[12,12],
+  ds:'Aprendiz do caçador da vila, tem a companhia de um lobo enorme e leal.',
+  sk:mk([4,8,4,6,4,4,4,4,6,4,4,4,6,6,4,8,4,10,8,6]),
+  ab:[CORE.vigilante,{n:'Esquiva',t:'Uma vez por rodada, quando sofre um ataque, pode fazer um teste de Acrobacia (d8+d4) oposto ao teste de ataque como uma ação livre. Se vencer, evita o ataque.'},{n:'Espectro, o Lobo',t:'Você possui um parceiro lobo que fornece +d6 em testes de ataque corpo a corpo (use Bônus +d6). Porém, se o dado do lobo rolar 1, ele terá se machucado e não poderá mais ajudá-lo pelo resto da cena.'}],
+  eq:[{n:'Arco curto de teixo',k:'d',dm:'RA+1',t:'Arma à distância.'},{n:'Lança de javali',k:'c',dm:'RA+2',t:'Fornece um aumento de passo no primeiro ataque da cena.'}],
+  rl:[rel('RHIONA',1,'DEVER','A ferreira é importante para a vila e deve ser protegida.'),rel('MUIRENN',2,'CUMPLICIDADE','Têm em comum o modo de vida apartado da vila.'),rel('CAVAN',0,'NEUTRO','O monge traz bons conselhos aos camponeses.'),rel('MALIK',0,'NEUTRO','O jeito bisbilhoteiro do andarilho não chega a incomodar.'),rel('SIRA',0,'NEUTRO','Só se viram uma vez.'),rel('SORCHA',0,'NEUTRO','Acha os rastros da passagem dela chamativos demais.'),rel('CORMAC',1,'TRANQUILIDADE','Sabe de onde ele vem pelos espinhos grudados em suas roupas, mas não o considera uma ameaça.')]})},
+ {id:'t4',n:'Muirenn',sub:'da Lua Pálida',x:9,y:6,hp:15,max:15,c:'#7a5aa6',o:'',s:P({cl:'executor',or:'Herborista',ag:21,at:[8,8,8],pd:[17,17],
+  ds:'Bruxa do bosque. Dizem ser filha das fadas. Possui conhecimentos de ervas e tradições ancestrais.',
+  sk:mk([4,4,8,6,8,4,6,4,4,6,6,6,4,8,4,4,4,4,8,6],{Aptidão:'Aptidão (Folclore)'}),
+  ab:[CORE.executor,{n:'Arsenal de Herborista',t:'Você possui uma pequena bolsa contendo preparados medicinais. Para usar o item, escolha um alvo e gaste uma ação. Cada item é de uso único.\n• Tônico de urtiga-feroz: o alvo recebe aumento de passo no atributo Físico por uma cena.\n• Bálsamo de confrei: o alvo recupera 2d4 PV (se for outro ser, ele precisa ficar parado nesta rodada).\n• Pote de vespa: teste de Sobrevivência para um ataque à distância, dano RA+1. Se o alvo sobreviver, perde sua próxima ação espantando as vespas.'}],
+  eq:[{n:'Faca ritualística',k:'c',dm:'RA+0',t:'Arma corpo a corpo.'},{n:'Maleta de medicamentos',k:'i',dm:'',t:''}],
+  rl:[rel('RHIONA',0,'NEUTRO','Não gosta de armas de metal, mas sabe que são necessárias.'),rel('ROWAN',2,'AMIZADE','Ao contrário do restante da vila, não tem medo do lobo.'),rel('CAVAN',0,'NEUTRO','Desaprova a doutrina escrita do monge, mas não a odeia.'),rel('MALIK',0,'NEUTRO','O julga tolo, mas não perigoso.'),rel('SIRA',0,'NEUTRO','Sabe que ela já se recuperou do naufrágio, mas finge debilidade.'),rel('SORCHA',0,'NEUTRO','Duvida que a guarda a protegeria de algum perigo.'),rel('CORMAC',0,'NEUTRO','Só mais um forasteiro sendo bem recebido na vila que a desamparou.')]})},
+ {id:'t5',n:'Cavan',sub:'Do Mosteiro do Olmo Cinzento',x:11,y:4,hp:15,max:15,c:'#8a6a3f',o:'',s:P({cl:'analista',or:'Professor',ag:26,at:[6,10,6],pd:[15,15],
+  ds:'Irmão. Monge enviado à vila como educador, contabilista e guia espiritual. Embora seja um erudito, seu corpo foi forjado pelo trabalho braçal no mosteiro.',
+  sk:mk([6,4,6,10,6,4,8,4,4,8,4,6,8,6,4,6,4,4,4,6],{Aptidão:'Aptidão (Erudição)'}),
+  ab:[CORE.analista,{n:'Curandeiro',t:'Você pode gastar uma ação e 2 PD para curar um aliado. Faça um teste de Medicina (DT 7). Se passar, você cura PV do aliado iguais à RA do teste. Você só pode usar este poder em um mesmo alvo uma vez por cena.'},{n:'Mentoria',t:'Quando ajuda outro personagem, você pode fazer um teste da perícia que usou para ajudar contra DT 7. Se passar, o personagem ajudado pode substituir um dos dados rolados por ele pela sua rolagem alta.'}],
+  eq:[{n:'Porrete',k:'c',dm:'RA+1',t:'Arma corpo a corpo.'}],
+  rl:[rel('RHIONA',3,'GRANDE AFEIÇÃO','Sentimento conflitante com seus votos monásticos.'),rel('ROWAN',0,'NEUTRO','Espera um dia poderem conversar melhor.'),rel('MUIRENN',0,'NEUTRO','Desaprova a tradição da curandeira, mas não a odeia.'),rel('MALIK',1,'ADMIRAÇÃO','Interesse pelo conhecimento trazido de outras terras.'),rel('SIRA',0,'NEUTRO','Aguarda ela se recuperar do naufrágio para fazer perguntas.'),rel('SORCHA',0,'NEUTRO','Acredita que ela já sofreu muito.'),rel('CORMAC',1,'DISCRIÇÃO','Reconhece seu sotaque de nobre bretão, mas não contou a ninguém.')]})},
+ {id:'t6',n:'Malik',sub:'ibn Qamar',x:13,y:6,hp:15,max:15,c:'#3f7cac',o:'',s:P({cl:'executor',or:'Explorador',ag:24,at:[6,6,10],pd:[19,19],
+  ds:'Andarilho árabe em busca das maravilhas e horrores nas fronteiras do mundo conhecido.',
+  sk:mk([4,4,8,6,4,4,6,4,4,6,4,4,4,4,4,10,6,8,6,4],{Aptidão:'Aptidão (Erudição)'}),
+  ab:[CORE.executor,{n:'Ímpeto Fervilhante',t:'No início de cada cena, você preenche um espaço de sua barra de ímpeto.'}],
+  eq:[{n:'Arco composto de Al-Andalus',k:'d',dm:'RA+1',t:'Arma à distância.'},{n:'Diário de viagem',k:'i',dm:'',t:''}],
+  rl:[rel('RHIONA',0,'NEUTRO','Gosta de tê-la como ouvinte de suas histórias.'),rel('ROWAN',0,'NEUTRO','Interessado em seu lobo e as superstições que o cercam.'),rel('MUIRENN',1,'ADMIRAÇÃO','Fascinado por seu conhecimento ancestral exótico.'),rel('CAVAN',1,'ADMIRAÇÃO','Fascinado por sua caligrafia e didática.'),rel('SIRA',1,'CURIOSIDADE','Enche-a de perguntas pessoais em toda oportunidade.'),rel('SORCHA',0,'NEUTRO','Sente-se oprimido pelo olhar desconfiado dela.'),rel('CORMAC',1,'CURIOSIDADE','Admira seu vocabulário.')]})},
+ {id:'t7',n:'Sira',sub:'Cissé',x:15,y:4,hp:20,max:20,c:'#2f7f7a',o:'',s:P({cl:'vigilante',or:'Viking',ag:27,at:[8,6,8],pd:[12,12],
+  ds:'Náufraga que chegou à vila recentemente. Tudo que se sabe de seu passado é que veio de muito longe.',
+  sk:mk([6,4,6,6,4,8,4,4,10,4,4,4,8,4,4,6,4,4,4,6],{Aptidão:'Aptidão (Erudição)'}),
+  ab:[CORE.vigilante,{n:'Antecipação Tática',t:'No início de qualquer combate, você pode gastar 2 PD. Se fizer isso, ganha uma rodada na qual pode agir antes dos demais personagens e NPCs.'},{n:'Sorrateiro',t:'Quando faz um teste usando Crime ou Furtividade, você pode gastar 3 PD para receber +d8 no teste (use Bônus +d8).'}],
+  eq:[{n:'Machado de batalha nórdico',k:'c',dm:'RA+3',t:'Arma corpo a corpo.'}],
+  rl:[rel('RHIONA',1,'ANSEIO','Deseja usar o poder social da ferreira para voltar para o mar.'),rel('ROWAN',0,'NEUTRO','Só se viram uma vez.'),rel('MUIRENN',1,'GRATIDÃO','A curandeira tratou suas feridas após o naufrágio.'),rel('CAVAN',1,'ANSEIO','Deseja usar o poder religioso do monge para voltar para o mar.'),rel('MALIK',0,'NEUTRO','Não gosta de suas perguntas desnecessárias.'),rel('SORCHA',1,'RESPEITO','Reconhece a força da guerreira e sabe que pode contar com ela em uma luta.'),rel('CORMAC',1,'EMPATIA','Suspeita que o jovem esteja escondendo algo, o que os torna iguais.')]})}
+ ];
+ return T;
+}
+module.exports={presets,CORE,STD,mk};
