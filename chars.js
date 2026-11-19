@@ -51,6 +51,27 @@ function presets(){
   eq:[{n:'Machado de batalha nórdico',k:'c',dm:'RA+3',t:'Arma corpo a corpo.'}],
   rl:[rel('RHIONA',1,'ANSEIO','Deseja usar o poder social da ferreira para voltar para o mar.'),rel('ROWAN',0,'NEUTRO','Só se viram uma vez.'),rel('MUIRENN',1,'GRATIDÃO','A curandeira tratou suas feridas após o naufrágio.'),rel('CAVAN',1,'ANSEIO','Deseja usar o poder religioso do monge para voltar para o mar.'),rel('MALIK',0,'NEUTRO','Não gosta de suas perguntas desnecessárias.'),rel('SORCHA',1,'RESPEITO','Reconhece a força da guerreira e sabe que pode contar com ela em uma luta.'),rel('CORMAC',1,'EMPATIA','Suspeita que o jovem esteja escondendo algo, o que os torna iguais.')]})}
  ];
- return T;
+ const IMG={t1:'cormac',t2:'rhiona',t3:'rowan',t4:'muirenn',t5:'cavan',t6:'malik',t7:'sira'};
+ return T.map(t=>({...t,img:'/img/'+IMG[t.id]+'.webp',on:false,z:1,lr:5,cb:true,pc:true}));
 }
-module.exports={presets,CORE,STD,mk};
+// Criaturas do livro (Missões 1 e 2). Estatísticas e textos conforme as páginas do playtest.
+const sd=o=>{const a=Array(20).fill(4);for(const [n,v] of Object.entries(o))a[STD.indexOf(n)]=v;return mk(a)};
+const CREATURES=[
+ {key:'afogado',name:'Afogado',img:'/img/afogado.webp',z:1,hp:10,s:P({cl:'executor',or:'Criatura',at:[8,4,4],pd:[0,0],ds:'Uma forma rastejante coberta de lama e vegetação, de cuja boca e olhos verte água e lodo.',sk:sd({Atletismo:6,Luta:6}),
+  ab:[{n:'Afogar',t:'O afogado agarra e empurra a vítima contra a água. Enquanto estiver agarrada, a vítima só pode tentar escapar (não pode fazer outras ações) e perde 6d6 PV no final de cada rodada. Só pode usar perto de um corpo d’água e, enquanto agarra, não pode fazer outras ações.'},{n:'Escapar',t:'Na fase de ataque corpo a corpo, a vítima faz um teste de Acrobacia ou Luta oposto ao teste de Luta do afogado, com redução de passo. Se vencer, se solta. Outros personagens podem gastar suas ações para salvar a vítima (mesmo teste, sem a redução de passo).'}],
+  eq:[{n:'Garras',k:'c',dm:'RA+1',t:'Ataque corpo a corpo (d8 + d6).'},{n:'Afogar',k:'c',dm:'',t:'Ataque corpo a corpo (d8 + d6) para agarrar. Veja a habilidade Afogar.'}]})},
+ {key:'aughisk',name:'Aughisk',img:'/img/aughisk.webp',z:2,hp:40,s:P({cl:'executor',or:'Criatura · Morte e Medo',at:[10,6,8],pd:[0,0],ds:'Cavalo descarnado com o torso de um homem fundido ao lombo. Sádico e violento.',sk:sd({Atletismo:10,Luta:10,Percepção:10}),
+  ab:[{n:'Redução de dano 10',t:'Reduz em 10 todo dano recebido. Se o crânio do cavalo for destruído, o aughisk fica atordoado por 1 rodada e perde a redução de dano.'},
+   {n:'Presença Aterradora',t:'No início da cena, todas as pessoas vendo o aughisk sofrem 2d6 pontos de dano emocional. Disciplina (DT 10) reduz à metade; NEX 35%+ evita.'},
+   {n:'Tributo Mortal',t:'Se começar uma rodada com 20 ou menos PV, todos os afogados na ilhota gastam sua ação na fase geral caminhando até ele. Explodem em lodo preto, e o aughisk recupera 10 PV por afogado destruído.'},
+   {n:'Investida Equina',t:'Na fase geral, avança na direção de um personagem. Este pode gastar sua ação para esquivar. Na fase corpo a corpo, teste de Atletismo (d10 + d10) oposto ao de Acrobacia dele (+d6 se tentou esquivar). Se vencer, causa RA+3 de dano de impacto e deixa o alvo atordoado por 1 rodada e caído.'},
+   {n:'Enxurrada de Morte',t:'Gasta duas ações na fase geral (1ª: ergue os braços e a água borbulha; 2ª: conclui o ritual). Todos fazem teste de Acrobacia (DT 13): quem passa sofre d6 de dano; quem falha sofre 2d6 e fica caído. Quem gastar a ação procurando abrigo durante a 1ª ação recebe +d6 e, se passar, não sofre dano.'},
+   {n:'Estratégia',t:'1ª rodada: ataque corpo a corpo no mais forte alcançável. 2ª: Investida Equina. 3ª: começa a Enxurrada da Morte. 4ª: termina o ritual. 5ª: reinicia o ciclo.'}],
+  eq:[{n:'Espada',k:'c',dm:'RA+4',t:'Ataque corpo a corpo (d10 + d10).'},{n:'Coice',k:'c',dm:'RA+3',t:'Ataque corpo a corpo (d10 + d10).'}]})},
+ {key:'cria',name:'Cria da Floresta',img:'/img/cria.webp',z:1,hp:10,s:P({cl:'executor',or:'Criatura',at:[6,4,4],pd:[0,0],ds:'Humanoides baixos e esguios, de pele pálida como o luar, garras longas e olhos grandes e luminosos.',sk:sd({Acrobacia:6,Atletismo:6,Luta:6,Percepção:6}),
+  ab:[{n:'Derrubar',t:'Escolhe um alvo e faz um teste de Luta oposto contra ele. Se vencer, derruba o alvo (Caído). Várias crias no mesmo alvo: a primeira pode derrubar para facilitar o ataque das outras.'}],
+  eq:[{n:'Garras',k:'c',dm:'RA+1',t:'Ataque corpo a corpo (d6 + d6).'}]})},
+ {key:'ellen',name:'Ellén Trechend',img:'/img/ellen.webp',z:2,hp:1,s:P({cl:'executor',or:'Criatura · Perseguição',at:[12,6,6],pd:[0,0],ds:'Monstruosidade de três cabeças (olhos, presas e língua bifurcada com veneno).',sk:sd({}),
+  ab:[{n:'Sem ficha de combate',t:'No livro, o Ellén Trechend aparece na Cena 4 como uma perseguição de 5 rodadas, sem PV definidos. No fim da 3ª rodada alcança quem tiver menos de 15 PA; no fim da 4ª, menos de 20 PA; no fim da 5ª, menos de 30 PA.'}],eq:[]})}
+];
+module.exports={presets,CORE,STD,mk,CREATURES};

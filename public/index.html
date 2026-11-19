@@ -77,6 +77,9 @@ button.die{cursor:pointer}.die.d4{clip-path:polygon(50% 4%,100% 96%,0 96%);paddi
 .cr{display:flex;gap:6px;align-items:center;padding:3px 4px;border-radius:4px;flex-wrap:wrap;cursor:pointer}.cr.on{background:rgba(138,59,42,.2)}.cr.dn{opacity:.5}.cr select{font-size:12px;padding:1px}.cr button{font-size:11px;padding:1px 6px}
 .cc{font:700 10px Barlow,sans-serif;color:#fff;border-radius:8px;padding:0 7px;text-transform:uppercase;letter-spacing:.05em}
 .cg{margin:6px 0;border-left:3px solid var(--line);padding-left:6px}.cg.cur{border-left-color:var(--acc);background:rgba(138,59,42,.07)}.cg h3{margin:0;font:800 12px Cinzel,Georgia,serif;letter-spacing:.06em}
+.lib{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:8px 0}.lib b{font:800 12px Cinzel,Georgia,serif;letter-spacing:.06em}
+.li{display:flex;gap:6px;align-items:center;padding:2px 0}.li img{width:30px;height:30px;object-fit:contain}.li span{flex:1;font-size:13px}.li button{font-size:11px;padding:1px 7px}
+.tl button{font-size:11px;padding:2px 7px}.tl button.on{background:var(--acc);color:#fff}
 </style>
 </head>
 <body>
@@ -91,6 +94,7 @@ button.die{cursor:pointer}.die.d4{clip-path:polygon(50% 4%,100% 96%,0 96%);paddi
 <aside>
 <div class="row" id="gmbar" hidden><button id="add">+ Token</button><button class="g" id="mapb">Mapa…</button><button class="g" id="mapx">Limpar mapa</button><button class="g" id="rst">Restaurar personagens</button></div>
 <input type="file" id="file" accept="image/*" hidden><input type="file" id="tkfile" accept="image/*" hidden>
+<div id="lib" hidden></div>
 <div id="sel"></div>
 <h2>Combate</h2><div id="cbox"></div>
 <h2>Rolagens</h2><div id="log"></div>
@@ -111,17 +115,19 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const $=id=>document.getElementById(id);
 const cv=$('cv'),ctx=cv.getContext('2d');cv.width=W;cv.height=H;
 const blankS=()=>({cl:'executor',or:'',lv:1,ag:0,ds:'',at:[6,6,6],up:[0,0,0],sk:Object.keys(ATTR).map(n=>({n,d:4})),pd:[10,10],im:0,an:0,ar:0,ab:[],eq:[],rl:[],bio:''});
+const N=COLS*ROWS;
+let fog={on:false,seen:'0'.repeat(N),walls:'0'.repeat(N)},cfg={open:true},lib=[],placing=null,tool='move',paint=null,doff={x:0,y:0};
 let combat={on:false,round:1,phase:0,mode:'perfil',pick:{},done:{}},imgTarget=null,IM={};
 let ws=null,me=null,tokens=[],mapImg=null,sel=null,drag=null,joined=null,lastMove=0,logs=[],tab=0,ft=null;
 let ro={dt:7,step:0,bonus:'',pav:false};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,Math.trunc(+v)||0));
 const tx=m=>ws&&ws.readyState===1&&ws.send(JSON.stringify(m));
 const cur=()=>tokens.find(k=>k.id===sel);
-const can=t=>t&&me&&(me.gm||(t.o&&t.o===me.name));
+const can=t=>t&&me&&(me.gm||(t.o&&t.o===me.name)||(cfg.open&&t.pc!==false));
 const busy=()=>{const a=document.activeElement;return a&&$('ov').contains(a)&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)};
 const getP=(o,p)=>p.split('.').reduce((x,k)=>x&&x[k],o);
 const setP=(o,p,v)=>{const a=p.split('.');let x=o;for(let i=0;i<a.length-1;i++)x=x[a[i]];x[a[a.length-1]]=v};
-const fix=t=>{t.s=t.s||blankS();return t};
+const fix=t=>{t.s=t.s||blankS();t.z=t.z||1;return t};
 const BADGE={executor:['E','#b5483a'],analista:['A','#3f7cac'],vigilante:['V','#4f8a5b']};
 const av=(t,z=26)=>`<span class="av" style="--z:${z}px;background:${t.c}">${t.img?`<img src="${t.img}">`:esc((t.n[0]||'?').toUpperCase())}</span>`;
 function setImg(t){delete IM[t.id];if(t.img){const im=new Image();im.onload=()=>{IM[t.id]=im;draw()};im.src=t.img}}
@@ -132,7 +138,7 @@ function connect(){
   ws.onclose=()=>{$('st').textContent='Desconectado – reconectando…';setTimeout(connect,2000)};
   ws.onmessage=e=>{const m=JSON.parse(e.data);
     if(m.t==='error'){joined=null;me=null;$('login').hidden=false;$('err').textContent=m.msg}
-    else if(m.t==='init'){me=m.me;$('login').hidden=true;$('gmbar').hidden=!me.gm;tokens=m.tokens.map(fix);tokens.forEach(setImg);combat=m.combat||combat;setMap(m.map);logs=m.log;
+    else if(m.t==='init'){me=m.me;$('login').hidden=true;$('gmbar').hidden=!me.gm;tokens=m.tokens.map(fix);tokens.forEach(setImg);combat=m.combat||combat;fog=m.fog||fog;cfg.open=m.open!==false;lib=m.lib||[];setMap(m.map);logs=m.log;
       if(!sel&&tokens.length)sel=(tokens.find(t=>t.o===me.name)||tokens[0]).id;quick();renderLog();draw()}
     else if(m.t==='full'){tokens=m.tokens.map(fix);tokens.forEach(setImg);if(!tokens.some(t=>t.id===sel))sel=null;quick();rerender();draw()}
     else if(m.t==='state'){const dl=drag&&tokens.find(k=>k.id===drag),keep=dl&&{x:dl.x,y:dl.y},old=Object.fromEntries(tokens.map(t=>[t.id,t.s]));
@@ -141,6 +147,8 @@ function connect(){
     else if(m.t==='sheet'){const t=tokens.find(k=>k.id===m.id);if(t){t.s=m.s;quick();if(!busy())rerender();renderLog()}}
     else if(m.t==='img'){const t=tokens.find(k=>k.id===m.id);if(t){t.img=m.data;setImg(t);quick();if(!busy())rerender();draw()}}
     else if(m.t==='combat'){combat=m.c;renderCombat()}
+    else if(m.t==='fog'){fog=m.f;draw();renderLib()}
+    else if(m.t==='cfg'){cfg.open=m.open;quick();rerender()}
     else if(m.t==='map')setMap(m.data);
     else if(m.t==='roll'){const i=logs.findIndex(x=>x.id===m.r.id);if(i>=0)logs[i]=m.r;else logs.unshift(m.r);logs.length=Math.min(logs.length,40);renderLog()}
     else if(m.t==='who')$('who').textContent='Na mesa: '+m.list.join(', ')};
@@ -149,61 +157,93 @@ $('lf').onsubmit=e=>{e.preventDefault();joined={name:$('ln').value,pw:$('lp').va
 try{$('ln').value=localStorage.getItem('mesa-n')||''}catch(e){}
 
 function setMap(d){if(!d){mapImg=null;draw();return}const im=new Image();im.onload=()=>{mapImg=im;draw()};im.src=d}
+const setCh=(str,i,v)=>str.slice(0,i)+v+str.slice(i+1);
+function litCells(x,y,r,walls){const out=[];
+  for(let cy=Math.max(0,y-r);cy<=Math.min(ROWS-1,y+r);cy++)for(let cx=Math.max(0,x-r);cx<=Math.min(COLS-1,x+r);cx++){
+    const dx=cx-x,dy=cy-y;if(dx*dx+dy*dy>r*r+.5)continue;
+    let x0=x,y0=y,bl=false;const sx=dx>0?1:-1,sy=dy>0?1:-1,ax=Math.abs(dx),ay=Math.abs(dy);let err=ax-ay;
+    while(!(x0===cx&&y0===cy)){const e2=2*err;if(e2>-ay){err-=ay;x0+=sx}if(e2<ax){err+=ax;y0+=sy}
+      if(x0===cx&&y0===cy)break;if(walls[y0*COLS+x0]==='1'){bl=true;break}}
+    if(!bl)out.push(cy*COLS+cx)}
+  return out}
+const rad=t=>t.lr>0?t.lr:1;
+function computeLit(){const lit=new Float32Array(N).fill(-1);
+  for(const t of tokens){if(t.on===false||!(t.lr>0||t.pc!==false))continue;const r=rad(t);
+    for(const i of litCells(t.x,t.y,r,fog.walls)){const d=Math.hypot(i%COLS-t.x,((i/COLS)|0)-t.y)/(r+.5);if(lit[i]<0||d<lit[i])lit[i]=d}}
+  return lit}
+const fogC=document.createElement('canvas');fogC.width=COLS;fogC.height=ROWS;const fctx=fogC.getContext('2d');
+function drawToken(t){
+  const z=t.z||1,x=t.x*CELL,y=t.y*CELL,S=z*CELL,im=IM[t.id];
+  ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(x+S/2,y+S-3,S*.36,S*.06,0,0,7);ctx.fill();
+  if(im)ctx.drawImage(im,x+1,y+1,S-2,S-2);
+  else{ctx.fillStyle=t.c;ctx.fillRect(x+3,y+3,S-6,S-6);ctx.fillStyle='#fff';ctx.font='bold '+Math.round(S*.45)+'px Georgia';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText((t.n[0]||'?').toUpperCase(),x+S/2,y+S/2)}
+  if(t.id===sel){ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.strokeRect(x+1.5,y+1.5,S-3,S-3)}
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  const B=t.pc!==false&&BADGE[t.s&&t.s.cl];
+  if(B){ctx.beginPath();ctx.arc(x+S-8,y+9,7.5,0,7);ctx.fillStyle=B[1];ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle='#fff';ctx.stroke();ctx.fillStyle='#fff';ctx.font='bold 10px Georgia';ctx.fillText(B[0],x+S-8,y+9.5)}
+  const bw=S-8,p=Math.max(0,t.hp/t.max);
+  ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(x+4,y+S-8,bw,5);ctx.fillStyle=p>.5?'#4caf50':p>.25?'#e0a800':'#d33';ctx.fillRect(x+4,y+S-8,bw*p,5);
+  ctx.font='bold 10px Barlow,Georgia';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.8)';ctx.strokeText(t.n,x+S/2,y+S-15);ctx.fillStyle='#fff';ctx.fillText(t.n,x+S/2,y+S-15)}
 function draw(){
-  const cs=getComputedStyle(document.documentElement);
+  const cs=getComputedStyle(document.documentElement),gm=me&&me.gm;
   ctx.fillStyle=cs.getPropertyValue('--map');ctx.fillRect(0,0,W,H);
   if(mapImg)ctx.drawImage(mapImg,0,0,W,H);
   ctx.strokeStyle=cs.getPropertyValue('--grid');ctx.lineWidth=1;ctx.globalAlpha=mapImg?.5:1;ctx.beginPath();
   for(let i=0;i<=COLS;i++){ctx.moveTo(i*CELL+.5,0);ctx.lineTo(i*CELL+.5,H)}
   for(let j=0;j<=ROWS;j++){ctx.moveTo(0,j*CELL+.5);ctx.lineTo(W,j*CELL+.5)}
   ctx.stroke();ctx.globalAlpha=1;
-  for(const t of tokens){
-    const cx=t.x*CELL+CELL/2,cy=t.y*CELL+CELL/2,r=CELL*.44,im=IM[t.id];
-    ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.fillStyle=t.c;ctx.fill();
-    if(im){ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.clip();const k=Math.max(2*r/im.width,2*r/im.height);
-      ctx.drawImage(im,cx-im.width*k/2,cy-im.height*k*.42,im.width*k,im.height*k);ctx.restore()}
-    ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.lineWidth=t.id===sel?4:2.5;ctx.strokeStyle=t.id===sel?'#fff':t.c;ctx.stroke();
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    if(!im){ctx.fillStyle='#fff';ctx.font='bold 16px Georgia';ctx.fillText((t.n[0]||'?').toUpperCase(),cx,cy)}
-    const B=t.pc!==false&&BADGE[t.s&&t.s.cl];
-    if(B){const bx=cx+r*.8,by=cy-r*.8;ctx.beginPath();ctx.arc(bx,by,8,0,7);ctx.fillStyle=B[1];ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle='#fff';ctx.stroke();ctx.fillStyle='#fff';ctx.font='bold 10px Georgia';ctx.fillText(B[0],bx,by+.5)}
-    const bw=CELL*.8,bx2=cx-bw/2,by2=cy+r+2,p=Math.max(0,t.hp/t.max);
-    ctx.fillStyle='rgba(0,0,0,.5)';ctx.fillRect(bx2,by2,bw,5);
-    ctx.fillStyle=p>.5?'#4caf50':p>.25?'#e0a800':'#d33';ctx.fillRect(bx2,by2,bw*p,5);
-    ctx.font='bold 10px Barlow,Georgia';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.75)';ctx.strokeText(t.n,cx,by2+13);ctx.fillStyle='#fff';ctx.fillText(t.n,cx,by2+13);
-  }
+  if(gm){ctx.fillStyle='rgba(170,70,40,.5)';for(let i=0;i<N;i++)if(fog.walls[i]==='1')ctx.fillRect((i%COLS)*CELL,((i/COLS)|0)*CELL,CELL,CELL)}
+  const lit=fog.on?computeLit():null;
+  for(const t of tokens){if(t.on===false)continue;if(lit&&!gm&&t.pc===false&&!(lit[t.y*COLS+t.x]>=0))continue;drawToken(t)}
+  if(lit){fctx.clearRect(0,0,COLS,ROWS);
+    for(let i=0;i<N;i++){let a;if(lit[i]>=0){const d=lit[i];a=d<.5?0:(d-.5)/.5*.3}else a=fog.seen[i]==='1'?.62:.97;if(gm)a*=.45;
+      if(a>0){fctx.fillStyle='rgba(5,8,10,'+a.toFixed(2)+')';fctx.fillRect(i%COLS,(i/COLS)|0,1,1)}}
+    ctx.imageSmoothingEnabled=true;ctx.drawImage(fogC,0,0,W,H)}
 }
 const pos=e=>{const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}};
-const hit=p=>{for(let i=tokens.length-1;i>=0;i--){const t=tokens[i];if(Math.hypot(p.x-(t.x*CELL+CELL/2),p.y-(t.y*CELL+CELL/2))<CELL*.45)return t}return null};
-cv.addEventListener('pointerdown',e=>{const t=hit(pos(e));sel=t?t.id:null;drag=t&&can(t)?t.id:null;if(drag)cv.setPointerCapture(e.pointerId);quick();renderLog();draw()});
+const cellOf=p=>({x:clamp(Math.floor(p.x/CELL),0,COLS-1),y:clamp(Math.floor(p.y/CELL),0,ROWS-1)});
+function hit(p){const gm=me&&me.gm,lit=fog.on&&!gm?computeLit():null;
+  for(let i=tokens.length-1;i>=0;i--){const t=tokens[i];if(t.on===false)continue;const z=t.z||1;
+    if(p.x>=t.x*CELL&&p.x<(t.x+z)*CELL&&p.y>=t.y*CELL&&p.y<(t.y+z)*CELL){if(lit&&t.pc===false&&!(lit[t.y*COLS+t.x]>=0))continue;return t}}return null}
+function paintAt(c){if(!paint)return;const i=c.y*COLS+c.x;if(paint.cells.has(i))return;paint.cells.add(i);const k=paint.kind==='wall'?'walls':'seen';fog[k]=setCh(fog[k],i,paint.v?'1':'0');draw()}
+cv.addEventListener('pointerdown',e=>{const p=pos(e),c=cellOf(p),gm=me&&me.gm;
+  if(placing&&gm){tx({t:'place',...placing,x:c.x,y:c.y});placing=null;cv.style.cursor='';renderLib();return}
+  if(gm&&tool!=='move'){paint={kind:tool.startsWith('wall')?'wall':'seen',v:tool.endsWith('1')?1:0,cells:new Set()};cv.setPointerCapture(e.pointerId);paintAt(c);return}
+  const t=hit(p);sel=t?t.id:null;drag=t&&can(t)?t.id:null;if(drag){doff={x:c.x-t.x,y:c.y-t.y};cv.setPointerCapture(e.pointerId)}quick();renderLog();draw()});
 cv.addEventListener('dblclick',e=>{const t=hit(pos(e));if(t)openSheet(t.id)});
-cv.addEventListener('pointermove',e=>{if(!drag)return;const t=tokens.find(k=>k.id===drag),p=pos(e);if(!t)return;
-  const nx=clamp(Math.floor(p.x/CELL),0,COLS-1),ny=clamp(Math.floor(p.y/CELL),0,ROWS-1);
+cv.addEventListener('pointermove',e=>{const c=cellOf(pos(e));if(paint){paintAt(c);return}if(!drag)return;const t=tokens.find(k=>k.id===drag);if(!t)return;
+  const z=t.z||1,nx=clamp(c.x-doff.x,0,COLS-z),ny=clamp(c.y-doff.y,0,ROWS-z);
   if(nx!==t.x||ny!==t.y){t.x=nx;t.y=ny;draw();const n=Date.now();if(n-lastMove>60){lastMove=n;tx({t:'move',id:t.id,x:nx,y:ny})}}});
-cv.addEventListener('pointerup',()=>{const t=drag&&tokens.find(k=>k.id===drag);drag=null;if(t)tx({t:'move',id:t.id,x:t.x,y:t.y})});
+cv.addEventListener('pointerup',()=>{if(paint){tx({t:'fogop',op:'paint',kind:paint.kind,v:paint.v,cells:[...paint.cells]});paint=null;return}
+  const t=drag&&tokens.find(k=>k.id===drag);drag=null;if(t)tx({t:'move',id:t.id,x:t.x,y:t.y})});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&placing){placing=null;cv.style.cursor='';renderLib()}});
 
 const patch=(t,f,now)=>{clearTimeout(ft);const go=()=>tx({t:'patch',id:t.id,f});now?go():ft=setTimeout(go,350)};
 const pips=(cur,max,k,ed)=>Array.from({length:Math.min(max,40)},(_,i)=>`<i class="bx${i<cur?' on':''}"${ed?` data-box="${k}:${i}"`:''}></i>`).join('');
 
 /* ----- painel rápido (lateral) ----- */
 function quick(){
-  renderCombat();const box=$('sel'),t=cur();
+  renderCombat();renderLib();const box=$('sel'),t=cur();
   if(!t){box.innerHTML='<p class="mut">Clique num token para selecionar. Duplo clique abre a ficha.</p>';return}
   const s=t.s,ed=can(t);
   box.innerHTML=`<div class="row">${av(t,42)}<h2 style="margin:0">${esc(t.n)} <span class="mut" style="text-transform:none;letter-spacing:0">${esc(CLS[s.cl]||'')} ${esc(s.or)}</span></h2></div>
   <div>PV ${t.hp}/${t.max}</div><div class="bar"><i style="width:${Math.max(0,t.hp/t.max*100)}%"></i></div>
   <div class="row"><button class="g" data-q="hp:-5"${ed?'':' disabled'}>−5</button><button class="g" data-q="hp:-1"${ed?'':' disabled'}>−1</button><button class="g" data-q="hp:1"${ed?'':' disabled'}>+1</button><button class="g" data-q="hp:5"${ed?'':' disabled'}>+5</button><span style="flex:1"></span><span>PD ${s.pd[0]}/${s.pd[1]}</span></div>
   <div class="row"><button id="opn">Abrir ficha completa</button></div>
+  ${ed?`<div class="row sm"><span class="mut">Tamanho</span><button class="${(t.z||1)===1?'':'g'}" data-z="1">1×1</button><button class="${t.z===2?'':'g'}" data-z="2">2×2</button>${me.gm?`<span class="mut">Luz</span><select data-lr>${[[0,'sem luz'],[3,'3 quadrados'],[5,'5 quadrados'],[8,'8 quadrados'],[12,'12 quadrados']].map(([v,l])=>`<option value="${v}"${(t.lr||0)===v?' selected':''}>${l}</option>`).join('')}</select>`:''}</div>`:''}
+  ${!me.gm&&t.pc!==false?(t.o===me.name?'<div class="row sm"><button class="g" data-claim="0">Soltar personagem</button></div>':(!t.o?'<div class="row sm"><button data-claim="1">Assumir este personagem</button></div>':'')):''}
   ${ed?`<div class="row sm"><button class="g" data-img="1">Imagem do token…</button>${t.img?'<button class="g" data-img="0">Remover imagem</button>':''}</div>`:''}
   ${me.gm?`<div class="row sm"><label><input type="checkbox" data-cbx${t.cb!==false?' checked':''}> No combate</label><label><input type="checkbox" data-pcx${t.pc!==false?' checked':''}> Personagem (desmarque p/ NPC)</label></div>`:''}
-  ${me.gm?`<div class="row"><span class="mut">Jogador:</span><input id="ow" maxlength="20" value="${esc(t.o||'')}" placeholder="nome do jogador" style="flex:1"><button class="g" id="del">Remover</button></div>`:`<p class="mut">${t.o?'Jogador: '+esc(t.o):'Sem jogador'}</p>`}`;
+  ${me.gm?`<div class="row"><span class="mut">Jogador:</span><input id="ow" maxlength="20" value="${esc(t.o||'')}" placeholder="nome do jogador" style="flex:1"><button class="g" id="del">${t.pc!==false?'Retirar do mapa':'Remover'}</button></div>`:`<p class="mut">${t.o?'Jogador: '+esc(t.o):'Sem jogador'}</p>`}`;
 }
 $('sel').addEventListener('click',e=>{const t=cur(),b=e.target.closest('button');if(!t||!b)return;
   if(b.dataset.img!==undefined){if(b.dataset.img==='1'){imgTarget=t.id;$('tkfile').click()}else tx({t:'img',id:t.id,data:null});return}
   if(b.id==='opn')return openSheet(t.id);
-  if(b.id==='del'){tx({t:'del',id:t.id});sel=null;return}
+  if(b.id==='del'){tx({t:'unplace',id:t.id});sel=null;return}
+  if(b.dataset.z){tx({t:'tok',id:t.id,z:+b.dataset.z});return}
+  if(b.dataset.claim!==undefined){tx({t:'claim',id:t.id,v:+b.dataset.claim});return}
   if(b.dataset.q){t.hp=clamp(t.hp+ +b.dataset.q.split(':')[1],0,t.max);patch(t,{hp:t.hp},1);quick();draw()}});
-$('sel').addEventListener('change',e=>{const t=cur();if(!t)return;const d=e.target.dataset;if(e.target.id==='ow')tx({t:'owner',id:t.id,o:e.target.value});else if(d.cbx!==undefined)tx({t:'combat',op:'cb',id:t.id,v:e.target.checked});else if(d.pcx!==undefined)tx({t:'combat',op:'pc',id:t.id,v:e.target.checked})});
+$('sel').addEventListener('change',e=>{const t=cur();if(!t)return;const d=e.target.dataset;if(e.target.id==='ow')tx({t:'owner',id:t.id,o:e.target.value});else if(d.lr!==undefined)tx({t:'tok',id:t.id,lr:+e.target.value});else if(d.cbx!==undefined)tx({t:'combat',op:'cb',id:t.id,v:e.target.checked});else if(d.pcx!==undefined)tx({t:'combat',op:'pc',id:t.id,v:e.target.checked})});
 $('add').onclick=()=>tx({t:'add'});$('rst').onclick=()=>{if(confirm('Restaurar os 7 personagens prontos? Isso apaga as alterações e o histórico.'))tx({t:'reset'})};
 $('mapb').onclick=()=>$('file').click();$('mapx').onclick=()=>tx({t:'map',data:null});
 $('file').onchange=()=>{const f=$('file').files[0];if(!f)return;const im=new Image();
@@ -326,7 +366,7 @@ function cmp(a,b){const na=a.pc===false?1:0,nb=b.pc===false?1:0;if(na!==nb)retur
   if(combat.mode==='perfil'&&!na){const d=(CO[a.s.cl]??3)-(CO[b.s.cl]??3);if(d)return d}return tokens.indexOf(a)-tokens.indexOf(b)}
 function renderCombat(){
   const el=$('cbox');if(!el||!me)return;const a=document.activeElement;if(a&&el.contains(a)&&a.tagName==='SELECT')return;
-  const c=combat,gm=me.gm,mem=tokens.filter(t=>t.cb!==false).sort(cmp);let h='';
+  const c=combat,gm=me.gm,mem=tokens.filter(t=>t.cb!==false&&t.on!==false).sort(cmp);let h='';
   if(gm)h+=`<div class="row sm">${c.on?'<button class="g" data-c="stop">Encerrar</button><button class="g" data-c="prev">◀ Fase</button><button data-c="next">Próxima fase ▶</button>':'<button data-c="start">Iniciar combate</button>'}
     <select data-cmode><option value="perfil"${c.mode==='perfil'?' selected':''}>Ordem: Executor → Analista → Vigilante</option><option value="livro"${c.mode==='livro'?' selected':''}>Ordem: livro (sem ordem fixa)</option></select></div>`;
   if(!c.on){el.innerHTML=h+'<p class="mut">Nenhum combate em andamento.</p>';return}
@@ -348,6 +388,31 @@ $('cbox').addEventListener('click',e=>{
 $('cbox').addEventListener('change',e=>{const d=e.target.dataset;
   if(d.cmode!==undefined)tx({t:'combat',op:'mode',v:e.target.value});
   else if(d.cpick)tx({t:'combat',op:'pick',id:d.cpick,ph:e.target.value===''?-2:+e.target.value})});
+/* ----- biblioteca (mestre) + névoa ----- */
+function renderLib(){
+  const el=$('lib');if(!el)return;if(!me||!me.gm){el.hidden=true;return}el.hidden=false;
+  const a=document.activeElement;if(a&&el.contains(a)&&/INPUT|SELECT/.test(a.tagName)&&a.type!=='checkbox')return;
+  const pcs=tokens.filter(t=>t.pc!==false);
+  const T=(k,l)=>`<button class="g${tool===k?' on':''}" data-tool="${k}">${l}</button>`;
+  el.innerHTML=`<div class="lib"><b>Colocar no mapa</b>${placing?`<p class="mut">Clique no mapa para colocar <b>${esc(placing.name)}</b> (Esc cancela)</p>`:'<p class="mut">Escolha e clique no mapa onde quer colocar.</p>'}
+   <div class="mut" style="margin-top:4px">Personagens</div>
+   ${pcs.map(t=>`<div class="li">${av(t,30)}<span>${esc(t.n)}${t.o?` <small class="mut">(${esc(t.o)})</small>`:''}</span>${t.on===false?`<button data-placepc="${t.id}">Colocar</button>`:`<button class="g" data-unpl="${t.id}">Retirar</button>`}</div>`).join('')}
+   <div class="mut" style="margin-top:6px">Criaturas do livro</div>
+   ${lib.map(c=>`<div class="li"><img src="${c.img}"><span>${esc(c.name)} <small class="mut">PV ${c.hp} · ${c.z}×${c.z}</small></span><button data-placecr="${c.key}">Colocar</button></div>`).join('')}
+   <label class="mut" style="display:block;margin-top:6px"><input type="checkbox" data-open${cfg.open?' checked':''}> Jogadores editam as fichas de todos os personagens</label></div>
+  <div class="lib"><b>Iluminação e névoa de guerra</b>
+   <div class="row sm"><button class="${fog.on?'':'g'}" data-fog="${fog.on?0:1}">${fog.on?'Névoa ligada':'Névoa desligada'}</button><button class="g" data-fogop="all">Revelar tudo</button><button class="g" data-fogop="clear">Reiniciar exploração</button></div>
+   <div class="row tl">${T('move','Mover')}${T('seen1','Revelar')}${T('seen0','Esconder')}${T('wall1','Parede')}${T('wall0','Apagar parede')}<button class="g" data-fogop="clearwalls">Limpar paredes</button></div>
+   <p class="mut">Cada token com luz ilumina ao redor; paredes bloqueiam a visão. Áreas já vistas ficam escurecidas. Você vê a névoa em modo transparente.</p></div>`}
+$('lib').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+  if(d.placepc){const t=tokens.find(k=>k.id===d.placepc);placing={kind:'pc',id:d.placepc,name:t?t.n:''};cv.style.cursor='crosshair';tool='move'}
+  else if(d.placecr){const c=lib.find(k=>k.key===d.placecr);placing={kind:'cr',key:d.placecr,name:c?c.name:''};cv.style.cursor='crosshair';tool='move'}
+  else if(d.unpl){tx({t:'unplace',id:d.unpl});return}
+  else if(d.tool){tool=d.tool;placing=null;cv.style.cursor=tool==='move'?'':'crosshair'}
+  else if(d.fog!==undefined){tx({t:'fogop',op:'on',v:+d.fog});return}
+  else if(d.fogop){if(d.fogop==='clear'&&!confirm('Reiniciar a exploração? As áreas já vistas voltam a ficar escuras.'))return;tx({t:'fogop',op:d.fogop});return}
+  renderLib()});
+$('lib').addEventListener('change',e=>{if(e.target.dataset.open!==undefined)tx({t:'open',v:e.target.checked})});
 connect();
 </script>
 </body>

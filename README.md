@@ -26,6 +26,21 @@ persistente e defina `DATA_DIR` para a pasta do disco.
 - Os 7 personagens prontos já vêm carregados (Cormac, Rhiona, Rowan, Muirenn, Cavan, Malik, Sira).
   "Restaurar personagens" (mestre) volta tudo ao original.
 
+## Colocar coisas no mapa (mestre)
+O mapa começa vazio. No painel lateral, "Colocar no mapa": escolha um personagem ou uma criatura do livro
+(Afogado, Aughisk, Cria da Floresta, Ellén Trechend) e clique no mapa. Criaturas podem ser colocadas várias vezes.
+"Retirar" tira do mapa (personagens mantêm a ficha). Tamanho do token: 1×1 ou 2×2 (painel do token).
+Os desenhos dos tokens são as artes dos PDFs. Dá para trocar por qualquer imagem sua.
+
+## Fichas liberadas
+Por padrão, qualquer jogador edita a ficha de qualquer personagem (opção do mestre, desmarcável).
+O jogador também pode "Assumir este personagem" para ficar com o dele. Criaturas/NPCs só o mestre edita.
+
+## Iluminação e névoa de guerra
+Mestre: "Névoa ligada". Cada token com luz (padrão: personagens 5 quadrados) ilumina ao redor; paredes
+(ferramenta "Parede") bloqueiam a visão. O que já foi visto fica escurecido; criaturas fora da luz ficam
+invisíveis para os jogadores. Ferramentas: Revelar, Esconder, Parede, Apagar parede.
+
 ## Tokens com imagem
 - Selecione o token → "Imagem do token…" (ou "Imagem…" no canto da ficha). Vale para o mestre e para o jogador dono do token.
 - A imagem é recortada em círculo (256 px) e sincronizada para todos. Cada personagem mostra um selo da classe: E (Executor), A (Analista), V (Vigilante).

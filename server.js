@@ -1,13 +1,13 @@
 // Mesa de RPG – servidor (Node.js + WebSocket). Regras de teste: Ordem Paranormal II (playtest).
 const http = require('http'), fs = require('fs'), path = require('path');
 const { WebSocketServer } = require('ws');
-const { presets, STD } = require('./chars');
+const { presets, STD, CREATURES } = require('./chars');
 
 const PORT = process.env.PORT || 3000;
 const GM_PASSWORD = process.env.GM_PASSWORD || 'mestre';
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const FILE = path.join(DATA_DIR, 'state.json');
-const COLS = 22, ROWS = 14, VER = 3;
+const COLS = 22, ROWS = 14, N = COLS * ROWS, VER = 4;
 const ATTR = { Acrobacia:0, Animais:2, Aptidão:1, Atletismo:0, Bruxaria:1, Crime:0, Disciplina:2, Enganação:2, Furtividade:0, Inspecionar:1, Intimidar:2, Intuição:2, Luta:0, Medicina:1, Ofício:1, Percepção:1, Persuasão:2, Pontaria:0, Sobrevivência:1, Vigor:0 };
 const STEPS = [4,6,8,10,12], FACES = [4,6,8,10,12,20], CL = ['executor','vigilante','analista'];
 const base = n => String(n).replace(/\s*\(.*\)\s*/, '').trim();
@@ -29,9 +29,10 @@ function cleanS(s) {
     bio: str(s.bio, 3000) };
   o.pd[0] = Math.min(o.pd[0], o.pd[1]); return o;
 }
-let state = { ver: VER, tokens: presets().map(t => ({ ...t, s: cleanS(t.s) })), map: null, log: [] };
+let state = { ver: VER, tokens: presets().map(t => ({ ...t, s: cleanS(t.s) })), map: null, log: [], open: true };
 try { const d = JSON.parse(fs.readFileSync(FILE, 'utf8')); if (d.ver === VER) state = d; } catch (e) {}
 const norm = () => { state.tokens.forEach(t => { if (t.cb === undefined) t.cb = true; if (t.pc === undefined) t.pc = /^t[1-7]$/.test(t.id); });
+  state.fog = state.fog || { on: false, seen: '0'.repeat(N), walls: '0'.repeat(N) }; if (state.open === undefined) state.open = true;
   state.combat = state.combat || { on: false, round: 1, phase: 0, mode: 'perfil', pick: {}, done: {} }; };
 norm();
 let seq = state.log.reduce((m, r) => Math.max(m, r.id || 0), 0);
@@ -70,7 +71,7 @@ function rollTest(t, i, p) {
 }
 
 // ---- servidor ----
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.css': 'text/css' };
 const server = http.createServer((req, res) => {
   let p = req.url.split('?')[0]; if (p === '/') p = '/index.html';
   const root = path.join(__dirname, 'public'), f = path.join(root, path.normalize(p));
@@ -86,7 +87,26 @@ const send = (ws, m) => ws.readyState === 1 && ws.send(JSON.stringify(m));
 const bcast = (m, except) => { const s = JSON.stringify(m); wss.clients.forEach(c => { if (c !== except && c.me && c.readyState === 1) c.send(s); }); };
 const online = () => [...wss.clients].filter(c => c.me).map(c => c.me.name + (c.me.gm ? ' (mestre)' : ''));
 const sendPresence = () => bcast({ t: 'who', list: online() });
-const canEdit = (ws, t) => t && (ws.me.gm || (t.o && t.o === ws.me.name));
+const canEdit = (ws, t) => t && (ws.me.gm || (t.o && t.o === ws.me.name) || (state.open && t.pc));
+const fogB = () => bcast({ t: 'fog', f: state.fog });
+// ---- luz e visão (mesma lógica no cliente): linha de visão por Bresenham, paredes bloqueiam ----
+function litCells(x, y, r, walls) {
+  const out = [];
+  for (let cy = Math.max(0, y - r); cy <= Math.min(ROWS - 1, y + r); cy++) for (let cx = Math.max(0, x - r); cx <= Math.min(COLS - 1, x + r); cx++) {
+    const dx = cx - x, dy = cy - y; if (dx * dx + dy * dy > r * r + 0.5) continue;
+    let x0 = x, y0 = y, blocked = false; const sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1, ax = Math.abs(dx), ay = Math.abs(dy); let err = ax - ay;
+    while (!(x0 === cx && y0 === cy)) { const e2 = 2 * err; if (e2 > -ay) { err -= ay; x0 += sx; } if (e2 < ax) { err += ax; y0 += sy; }
+      if (x0 === cx && y0 === cy) break; if (walls[y0 * COLS + x0] === '1') { blocked = true; break; } }
+    if (!blocked) out.push(cy * COLS + cx);
+  }
+  return out;
+}
+function recalc() {
+  const f = state.fog; if (!f.on) return; const sn = f.seen.split(''); let ch = false;
+  for (const t of state.tokens) { if (!t.on) continue; const r = t.lr > 0 ? t.lr : (t.pc ? 1 : 0); if (!r) continue;
+    for (const i of litCells(t.x, t.y, r, f.walls)) if (sn[i] === '0') { sn[i] = '1'; ch = true; } }
+  if (ch) { f.seen = sn.join(''); fogB(); }
+}
 
 wss.on('connection', ws => {
   ws.on('message', raw => {
@@ -96,7 +116,7 @@ wss.on('connection', ws => {
       const gm = !!m.pw && m.pw === GM_PASSWORD;
       if (m.pw && !gm) return send(ws, { t: 'error', msg: 'Senha de mestre incorreta.' });
       ws.me = { name, gm };
-      send(ws, { t: 'init', me: ws.me, tokens: state.tokens, map: state.map, log: state.log, combat: state.combat });
+      send(ws, { t: 'init', me: ws.me, tokens: state.tokens, map: state.map, log: state.log, combat: state.combat, fog: state.fog, open: state.open, lib: CREATURES.map(c => ({ key: c.key, name: c.name, img: c.img, z: c.z, hp: c.hp })) });
       return sendPresence();
     }
     if (!ws.me) return;
@@ -104,7 +124,7 @@ wss.on('connection', ws => {
     const getLog = () => state.log.find(x => x.id === m.rid);
     switch (m.t) {
       case 'move': if (!canEdit(ws, t)) return;
-        t.x = clamp(m.x, 0, COLS - 1); t.y = clamp(m.y, 0, ROWS - 1); bcast(pub(), ws); save(); break;
+        t.x = clamp(m.x, 0, COLS - (t.z || 1)); t.y = clamp(m.y, 0, ROWS - (t.z || 1)); bcast(pub(), ws); recalc(); save(); break;
       case 'patch': { if (!canEdit(ws, t) || !m.f) return; const f = m.f;
         if ('n' in f) t.n = str(f.n, 24); if ('sub' in f) t.sub = str(f.sub, 40);
         if ('c' in f && /^#[0-9a-f]{6}$/i.test(f.c)) t.c = f.c;
@@ -112,11 +132,29 @@ wss.on('connection', ws => {
         t.hp = Math.min(t.hp, t.max); bcast(pub());
         if ('s' in f) { t.s = cleanS(f.s); sheetB(t); } save(); break; }
       case 'add': if (!gm) return;
-        state.tokens.push({ id: 't' + Date.now().toString(36) + rd(99), n: 'Novo', sub: '', x: 1, y: 1, hp: 10, max: 10, c: '#c79a2b', o: '', cb: true, pc: false, s: blank() });
+        state.tokens.push({ id: 't' + Date.now().toString(36) + rd(99), n: 'Novo', sub: '', x: 1, y: 1, hp: 10, max: 10, c: '#c79a2b', o: '', cb: true, pc: false, on: true, z: 1, lr: 0, s: blank() });
         if (state.tokens.length > 60) state.tokens.shift();
         bcast({ t: 'full', tokens: state.tokens }); save(); break;
-      case 'reset': if (!gm) return; state.tokens = presets().map(x => ({ ...x, s: cleanS(x.s) })); state.log = []; state.combat = null; norm();
+      case 'reset': if (!gm) return; state.tokens = presets().map(x => ({ ...x, s: cleanS(x.s) })); state.log = []; state.combat = null; norm(); recalc();
         bcast({ t: 'full', tokens: state.tokens }); save(); break;
+      case 'place': { if (!gm) return; const px = clamp(m.x, 0, COLS - 1), py = clamp(m.y, 0, ROWS - 1);
+        if (m.kind === 'pc') { if (!t || !t.pc) return; t.on = true; t.x = Math.min(px, COLS - t.z); t.y = Math.min(py, ROWS - t.z); }
+        else { const c = CREATURES.find(k => k.key === m.key); if (!c) return; const same = state.tokens.filter(k => k.cr === c.key).length;
+          state.tokens.push({ id: 'c' + Date.now().toString(36) + rd(99), cr: c.key, n: c.name + (same ? ' ' + (same + 1) : ''), sub: '', x: Math.min(px, COLS - c.z), y: Math.min(py, ROWS - c.z),
+            hp: c.hp, max: c.hp, c: '#555555', o: '', cb: true, pc: false, on: true, z: c.z, lr: 0, img: c.img, s: cleanS(c.s) }); }
+        bcast({ t: 'full', tokens: state.tokens }); recalc(); save(); break; }
+      case 'unplace': { if (!gm || !t) return; if (t.pc) t.on = false; else state.tokens = state.tokens.filter(k => k !== t);
+        delete state.combat.pick[t.id]; delete state.combat.done[t.id]; bcast({ t: 'full', tokens: state.tokens }); bcast({ t: 'combat', c: state.combat }); save(); break; }
+      case 'tok': { if (!canEdit(ws, t)) return; if ('z' in m) t.z = m.z === 2 ? 2 : 1; if (gm && 'lr' in m) t.lr = clamp(m.lr, 0, 12);
+        t.x = Math.min(t.x, COLS - t.z); t.y = Math.min(t.y, ROWS - t.z); bcast(pub()); recalc(); save(); break; }
+      case 'claim': { if (!t || !t.pc) return;
+        if (m.v) { if (t.o && !gm && t.o !== ws.me.name) return; t.o = ws.me.name; } else { if (!(gm || t.o === ws.me.name)) return; t.o = ''; }
+        bcast(pub()); save(); break; }
+      case 'open': if (!gm) return; state.open = !!m.v; bcast({ t: 'cfg', open: state.open }); save(); break;
+      case 'fogop': { if (!gm) return; const f = state.fog;
+        if (m.op === 'on') f.on = !!m.v; else if (m.op === 'clear') f.seen = '0'.repeat(N); else if (m.op === 'all') f.seen = '1'.repeat(N); else if (m.op === 'clearwalls') f.walls = '0'.repeat(N);
+        else if (m.op === 'paint') { const k = m.kind === 'wall' ? 'walls' : 'seen', a = f[k].split(''); for (const i of (Array.isArray(m.cells) ? m.cells : []).slice(0, 400)) a[clamp(i, 0, N - 1)] = m.v ? '1' : '0'; f[k] = a.join(''); }
+        else return; fogB(); recalc(); save(); break; }
       case 'img': { if (!canEdit(ws, t)) return;
         t.img = (typeof m.data === 'string' && m.data.startsWith('data:image/') && m.data.length < 450000) ? m.data : null;
         bcast({ t: 'img', id: t.id, data: t.img }); save(); break; }
