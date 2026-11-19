@@ -26,6 +26,10 @@ persistente e defina `DATA_DIR` para a pasta do disco.
 - Os 7 personagens prontos já vêm carregados (Cormac, Rhiona, Rowan, Muirenn, Cavan, Malik, Sira).
   "Restaurar personagens" (mestre) volta tudo ao original.
 
+## Criaturas e NPCs
+Mestre: "Remover" no painel do token, 🗑 na barra rápida (celular), tecla Delete, ou "Remover todas as criaturas" na biblioteca.
+Jogadores nunca recebem a ficha de criaturas/NPCs (o servidor não envia) e veem só a barra de vida, sem números.
+
 ## Documentos
 Aba/painel "Documentos". Mestre: "+ Enviar arquivo" (PDF, PNG, JPG, WEBP ou GIF, até 2,5 MB) ou "+ Nota de texto".
 Cada documento começa oculto: "Liberar" mostra aos jogadores, "Mostrar a todos" abre na tela de todo mundo agora.

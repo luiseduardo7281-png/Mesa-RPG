@@ -82,8 +82,17 @@ const server = http.createServer((req, res) => {
 });
 const wss = new WebSocketServer({ server, maxPayload: 4 * 1024 * 1024 });
 const light = ({ s, img, ...r }) => r;
-const pub = () => ({ t: 'state', tokens: state.tokens.map(light) });
-const sheetB = t => bcast({ t: 'sheet', id: t.id, s: t.s });
+// Jogadores não recebem a ficha (nem os números de PV) de criaturas/NPCs; só o mestre e o dono do token.
+const seesSheet = (ws, t) => ws.me.gm || t.pc || (t.o && t.o === ws.me.name);
+const viewTok = (ws, t, full) => {
+  let v = seesSheet(ws, t) ? t : { ...t, hp: Math.round(100 * t.hp / Math.max(1, t.max)), max: 100 };
+  if (!seesSheet(ws, t)) v = { ...v, s: undefined };
+  return full ? v : light(v);
+};
+const liveClients = f => wss.clients.forEach(c => { if (c.me && c.readyState === 1) f(c); });
+const statB = except => liveClients(c => { if (c !== except) c.send(JSON.stringify({ t: 'state', tokens: state.tokens.map(t => viewTok(c, t, false)) })); });
+const fullB = () => liveClients(c => c.send(JSON.stringify({ t: 'full', tokens: state.tokens.map(t => viewTok(c, t, true)) })));
+const sheetB = t => liveClients(c => { if (seesSheet(c, t)) c.send(JSON.stringify({ t: 'sheet', id: t.id, s: t.s })); });
 const send = (ws, m) => ws.readyState === 1 && ws.send(JSON.stringify(m));
 const bcast = (m, except) => { const s = JSON.stringify(m); wss.clients.forEach(c => { if (c !== except && c.me && c.readyState === 1) c.send(s); }); };
 const online = () => [...wss.clients].filter(c => c.me).map(c => c.me.name + (c.me.gm ? ' (mestre)' : ''));
@@ -120,7 +129,7 @@ wss.on('connection', ws => {
       const gm = !!m.pw && m.pw === GM_PASSWORD;
       if (m.pw && !gm) return send(ws, { t: 'error', msg: 'Senha de mestre incorreta.' });
       ws.me = { name, gm };
-      send(ws, { t: 'init', me: ws.me, tokens: state.tokens, map: state.map, log: state.log, combat: state.combat, fog: state.fog, open: state.open, docs: docsFor(ws), lib: CREATURES.map(c => ({ key: c.key, name: c.name, img: c.img, z: c.z, hp: c.hp })) });
+      send(ws, { t: 'init', me: ws.me, tokens: state.tokens.map(t => viewTok(ws, t, true)), map: state.map, log: state.log, combat: state.combat, fog: state.fog, open: state.open, docs: docsFor(ws), lib: CREATURES.map(c => ({ key: c.key, name: c.name, img: c.img, z: c.z, hp: c.hp })) });
       return sendPresence();
     }
     if (!ws.me) return;
@@ -128,32 +137,32 @@ wss.on('connection', ws => {
     const getLog = () => state.log.find(x => x.id === m.rid);
     switch (m.t) {
       case 'move': if (!canEdit(ws, t)) return;
-        t.x = clamp(m.x, 0, COLS - (t.z || 1)); t.y = clamp(m.y, 0, ROWS - (t.z || 1)); bcast(pub(), ws); recalc(); save(); break;
+        t.x = clamp(m.x, 0, COLS - (t.z || 1)); t.y = clamp(m.y, 0, ROWS - (t.z || 1)); statB(ws); recalc(); save(); break;
       case 'patch': { if (!canEdit(ws, t) || !m.f) return; const f = m.f;
         if ('n' in f) t.n = str(f.n, 24); if ('sub' in f) t.sub = str(f.sub, 40);
         if ('c' in f && /^#[0-9a-f]{6}$/i.test(f.c)) t.c = f.c;
         if ('max' in f) t.max = Math.max(1, clamp(f.max, 1, 999)); if ('hp' in f) t.hp = clamp(f.hp, 0, 999);
-        t.hp = Math.min(t.hp, t.max); bcast(pub());
+        t.hp = Math.min(t.hp, t.max); statB();
         if ('s' in f) { t.s = cleanS(f.s); sheetB(t); } save(); break; }
       case 'add': if (!gm) return;
         state.tokens.push({ id: 't' + Date.now().toString(36) + rd(99), n: 'Novo', sub: '', x: 1, y: 1, hp: 10, max: 10, c: '#c79a2b', o: '', cb: true, pc: false, on: true, z: 1, lr: 0, s: blank() });
         if (state.tokens.length > 60) state.tokens.shift();
-        bcast({ t: 'full', tokens: state.tokens }); save(); break;
+        fullB(); save(); break;
       case 'reset': if (!gm) return; state.tokens = presets().map(x => ({ ...x, s: cleanS(x.s) })); state.log = []; state.combat = null; norm(); recalc();
-        bcast({ t: 'full', tokens: state.tokens }); save(); break;
+        fullB(); save(); break;
       case 'place': { if (!gm) return; const px = clamp(m.x, 0, COLS - 1), py = clamp(m.y, 0, ROWS - 1);
         if (m.kind === 'pc') { if (!t || !t.pc) return; t.on = true; t.x = Math.min(px, COLS - t.z); t.y = Math.min(py, ROWS - t.z); }
         else { const c = CREATURES.find(k => k.key === m.key); if (!c) return; const same = state.tokens.filter(k => k.cr === c.key).length;
           state.tokens.push({ id: 'c' + Date.now().toString(36) + rd(99), cr: c.key, n: c.name + (same ? ' ' + (same + 1) : ''), sub: '', x: Math.min(px, COLS - c.z), y: Math.min(py, ROWS - c.z),
             hp: c.hp, max: c.hp, c: '#555555', o: '', cb: true, pc: false, on: true, z: c.z, lr: 0, img: c.img, s: cleanS(c.s) }); }
-        bcast({ t: 'full', tokens: state.tokens }); recalc(); save(); break; }
+        fullB(); recalc(); save(); break; }
       case 'unplace': { if (!gm || !t) return; if (t.pc) t.on = false; else state.tokens = state.tokens.filter(k => k !== t);
-        delete state.combat.pick[t.id]; delete state.combat.done[t.id]; bcast({ t: 'full', tokens: state.tokens }); bcast({ t: 'combat', c: state.combat }); save(); break; }
+        delete state.combat.pick[t.id]; delete state.combat.done[t.id]; fullB(); bcast({ t: 'combat', c: state.combat }); save(); break; }
       case 'tok': { if (!canEdit(ws, t)) return; if ('z' in m) t.z = m.z === 2 ? 2 : 1; if (gm && 'lr' in m) t.lr = clamp(m.lr, 0, 12);
-        t.x = Math.min(t.x, COLS - t.z); t.y = Math.min(t.y, ROWS - t.z); bcast(pub()); recalc(); save(); break; }
+        t.x = Math.min(t.x, COLS - t.z); t.y = Math.min(t.y, ROWS - t.z); statB(); recalc(); save(); break; }
       case 'claim': { if (!t || !t.pc) return;
         if (m.v) { if (t.o && !gm && t.o !== ws.me.name) return; t.o = ws.me.name; } else { if (!(gm || t.o === ws.me.name)) return; t.o = ''; }
-        bcast(pub()); save(); break; }
+        statB(); save(); break; }
       case 'open': if (!gm) return; state.open = !!m.v; bcast({ t: 'cfg', open: state.open }); save(); break;
       case 'fogop': { if (!gm) return; const f = state.fog;
         if (m.op === 'on') f.on = !!m.v; else if (m.op === 'clear') f.seen = '0'.repeat(N); else if (m.op === 'all') f.seen = '1'.repeat(N); else if (m.op === 'clearwalls') f.walls = '0'.repeat(N);
@@ -185,12 +194,14 @@ wss.on('connection', ws => {
         else if (op === 'next') { c.phase++; if (c.phase > 2) { c.phase = 0; c.round++; c.pick = {}; c.done = {}; } }
         else if (op === 'prev') { if (c.phase > 0) c.phase--; else if (c.round > 1) { c.round--; c.phase = 2; } }
         else if (op === 'mode') c.mode = m.v === 'livro' ? 'livro' : 'perfil';
-        else if (op === 'cb' && t) { t.cb = !!m.v; bcast(pub()); }
-        else if (op === 'pc' && t) { t.pc = !!m.v; bcast(pub()); }
+        else if (op === 'cb' && t) { t.cb = !!m.v; statB(); }
+        else if (op === 'pc' && t) { t.pc = !!m.v; fullB(); }
         else return;
         bcast({ t: 'combat', c: state.combat }); save(); break; }
-      case 'del': if (!gm || !t) return; state.tokens = state.tokens.filter(k => k !== t); delete state.combat.pick[t.id]; delete state.combat.done[t.id]; bcast(pub()); bcast({ t: 'combat', c: state.combat }); save(); break;
-      case 'owner': if (!gm || !t) return; t.o = str(m.o, 20); bcast(pub()); save(); break;
+      case 'del': if (!gm || !t) return; state.tokens = state.tokens.filter(k => k !== t); delete state.combat.pick[t.id]; delete state.combat.done[t.id]; statB(); bcast({ t: 'combat', c: state.combat }); save(); break;
+      case 'clearcr': { if (!gm) return; const rm = state.tokens.filter(k => !k.pc); state.tokens = state.tokens.filter(k => k.pc);
+        rm.forEach(k => { delete state.combat.pick[k.id]; delete state.combat.done[k.id]; }); fullB(); bcast({ t: 'combat', c: state.combat }); save(); break; }
+      case 'owner': if (!gm || !t) return; t.o = str(m.o, 20); fullB(); save(); break;
       case 'map': if (!gm) return;
         state.map = (typeof m.data === 'string' && m.data.startsWith('data:image/') && m.data.length < 3e6) ? m.data : null;
         bcast({ t: 'map', data: state.map }); save(); break;
