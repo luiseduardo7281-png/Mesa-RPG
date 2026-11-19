@@ -80,6 +80,38 @@ button.die{cursor:pointer}.die.d4{clip-path:polygon(50% 4%,100% 96%,0 96%);paddi
 .lib{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:8px 0}.lib b{font:800 12px Cinzel,Georgia,serif;letter-spacing:.06em}
 .li{display:flex;gap:6px;align-items:center;padding:2px 0}.li img{width:30px;height:30px;object-fit:contain}.li span{flex:1;font-size:13px}.li button{font-size:11px;padding:1px 7px}
 .tl button{font-size:11px;padding:2px 7px}.tl button.on{background:var(--acc);color:#fff}
+
+#wrap{position:relative;aspect-ratio:880/560}canvas{height:100%}
+#zm{position:absolute;right:6px;top:6px;display:flex;flex-direction:column;gap:4px;z-index:2}#zm button{width:36px;height:36px;padding:0;background:rgba(20,24,22,.78);color:#fff;font-size:18px;border-radius:8px}
+#mini{position:absolute;left:6px;right:52px;bottom:6px;background:rgba(18,23,21,.94);color:#eee;border:1px solid #4a4a42;border-radius:10px;padding:6px 8px;display:flex;gap:8px;align-items:center;z-index:2}
+#mini .bar{margin:3px 0}#mini small{color:#bbb}#mini button{padding:6px 10px;min-height:36px}#mini button.g{border-color:#666;color:#eee}
+body:not(.m) #mini{display:none!important}
+#tabs{display:none}
+.doc{flex-wrap:wrap;border-bottom:1px dotted var(--line);padding:5px 0}.doc .ic{flex:none;font-size:20px;flex:0 0 auto}.doc>span:nth-child(2){min-width:130px}
+#dv{position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column}
+#dh{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);padding-top:max(8px,env(safe-area-inset-top))}
+#dh b{font:800 15px Cinzel,Georgia,serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dh a{background:var(--acc);color:#fff;border-radius:6px;padding:6px 10px;text-decoration:none;font-size:13px}
+#db{flex:1;overflow:auto;padding:10px;-webkit-overflow-scrolling:touch}#db iframe{width:100%;height:100%;min-height:75vh;border:0;background:#fff}#db img{max-width:100%;display:block;margin:0 auto}
+.dtxt{white-space:pre-wrap;line-height:1.6;font-size:16px;max-width:760px;margin:0 auto;font-family:Georgia,serif}
+body.m header{padding:6px 10px}body.m #who{display:none}body.m h1{font-size:15px}
+body.m main{display:block;padding:0}
+body.m #wrap{aspect-ratio:auto;height:calc(100vh - 44px - 54px);height:calc(100dvh - 44px - 54px - env(safe-area-inset-bottom));border:0;border-radius:0}
+body.m aside{max-height:none;border:0;border-radius:0;padding:12px 12px 76px;min-height:calc(100vh - 100px)}
+body.m [data-sec]{display:none}
+body.m[data-tab="tok"] [data-sec="tok"],body.m[data-tab="cmb"] [data-sec="cmb"],body.m[data-tab="log"] [data-sec="log"],body.m[data-tab="doc"] [data-sec="doc"],body.m[data-tab="gm"] [data-sec="gm"]{display:block}
+body.m[data-tab="map"] aside{display:none}body.m:not([data-tab="map"]) #wrap{display:none}
+body.m #tabs{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--panel);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+body.m #tabs button{flex:1;background:transparent;color:var(--mut);border-radius:0;font-size:11px;padding:6px 2px;min-height:54px;line-height:1.15}
+body.m #tabs button span{display:block;font-size:18px}body.m #tabs button.on{color:var(--acc);box-shadow:inset 0 3px var(--acc)}
+body.m button,body.m select,body.m input{min-height:36px}body.m input[type=checkbox]{min-height:0}
+@media (max-width:820px){
+ #ov{padding:0}#sh{padding:14px 12px 20px;border-radius:0;min-height:100%;border-width:0}
+ #x{position:static;float:right;margin-bottom:6px}.por{width:84px;height:84px}
+ .sk{grid-template-columns:1fr auto auto auto 56px}.sk small{display:none}.skn{text-align:left}
+ #rb{margin:12px -12px -20px;padding:8px 12px}.ar{font-size:22px}
+ .cr select,.cr button{min-height:32px}.bx{width:17px;height:13px}
+}
 </style>
 </head>
 <body>
@@ -90,16 +122,23 @@ button.die{cursor:pointer}.die.d4{clip-path:polygon(50% 4%,100% 96%,0 96%);paddi
 <div id="err"></div><button style="width:100%">Entrar</button></form></div>
 <header><h1>Mesa de RPG</h1><span id="st">Conectando…</span><span id="who"></span></header>
 <main>
-<div id="wrap"><canvas id="cv"></canvas></div>
+<div id="wrap"><canvas id="cv"></canvas>
+ <div id="zm"><button id="zin" title="Aproximar">＋</button><button id="zout" title="Afastar">－</button><button id="zfit" title="Ajustar ao mapa">⤢</button></div>
+ <div id="mini" hidden></div></div>
 <aside>
+<section data-sec="gm">
 <div class="row" id="gmbar" hidden><button id="add">+ Token</button><button class="g" id="mapb">Mapa…</button><button class="g" id="mapx">Limpar mapa</button><button class="g" id="rst">Restaurar personagens</button></div>
 <input type="file" id="file" accept="image/*" hidden><input type="file" id="tkfile" accept="image/*" hidden>
 <div id="lib" hidden></div>
-<div id="sel"></div>
-<h2>Combate</h2><div id="cbox"></div>
-<h2>Rolagens</h2><div id="log"></div>
+</section>
+<section data-sec="tok"><div id="sel"></div></section>
+<section data-sec="cmb"><h2>Combate</h2><div id="cbox"></div></section>
+<section data-sec="log"><h2>Rolagens</h2><div id="log"></div></section>
+<section data-sec="doc"><h2>Documentos</h2><div id="docs"></div></section>
 </aside>
 </main>
+<nav id="tabs"><button data-tab="map" class="on"><span>🗺️</span>Mapa</button><button data-tab="tok"><span>🧙</span>Token</button><button data-tab="cmb"><span>⚔️</span>Combate</button><button data-tab="log"><span>🎲</span>Rolagens</button><button data-tab="doc"><span>📜</span>Docs</button><button data-tab="gm" id="tabgm" hidden><span>🛠️</span>Mestre</button></nav>
+<div id="dv" hidden><div id="dh"><b id="dt"></b><span style="flex:1"></span><a id="dl" target="_blank" rel="noopener" hidden>Abrir / baixar</a><button id="dx" class="g">✕ Fechar</button></div><div id="db"></div></div>
 <div id="ov" hidden><div id="sh"></div></div>
 <script>
 const COLS=22,ROWS=14,CELL=40,W=COLS*CELL,H=ROWS*CELL;
@@ -113,10 +152,11 @@ const CORE={
 const base=n=>n.replace(/\s*\(.*\)\s*/,'').trim(),attrOf=n=>ATTR[base(n)]??1;
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const $=id=>document.getElementById(id);
-const cv=$('cv'),ctx=cv.getContext('2d');cv.width=W;cv.height=H;
+const cv=$('cv'),ctx=cv.getContext('2d');
 const blankS=()=>({cl:'executor',or:'',lv:1,ag:0,ds:'',at:[6,6,6],up:[0,0,0],sk:Object.keys(ATTR).map(n=>({n,d:4})),pd:[10,10],im:0,an:0,ar:0,ab:[],eq:[],rl:[],bio:''});
 const N=COLS*ROWS;
 let fog={on:false,seen:'0'.repeat(N),walls:'0'.repeat(N)},cfg={open:true},lib=[],placing=null,tool='move',paint=null,doff={x:0,y:0};
+let docs=[],pendingDoc=null,view={s:1,x:0,y:0,user:false},cw=W,ch=H,dpr=1,ptrs=new Map(),pinch=null,pan=null,mob=false;
 let combat={on:false,round:1,phase:0,mode:'perfil',pick:{},done:{}},imgTarget=null,IM={};
 let ws=null,me=null,tokens=[],mapImg=null,sel=null,drag=null,joined=null,lastMove=0,logs=[],tab=0,ft=null;
 let ro={dt:7,step:0,bonus:'',pav:false};
@@ -138,7 +178,7 @@ function connect(){
   ws.onclose=()=>{$('st').textContent='Desconectado – reconectando…';setTimeout(connect,2000)};
   ws.onmessage=e=>{const m=JSON.parse(e.data);
     if(m.t==='error'){joined=null;me=null;$('login').hidden=false;$('err').textContent=m.msg}
-    else if(m.t==='init'){me=m.me;$('login').hidden=true;$('gmbar').hidden=!me.gm;tokens=m.tokens.map(fix);tokens.forEach(setImg);combat=m.combat||combat;fog=m.fog||fog;cfg.open=m.open!==false;lib=m.lib||[];setMap(m.map);logs=m.log;
+    else if(m.t==='init'){me=m.me;$('login').hidden=true;$('gmbar').hidden=!me.gm;tokens=m.tokens.map(fix);tokens.forEach(setImg);combat=m.combat||combat;docs=m.docs||[];$('tabgm').hidden=!me.gm;renderDocs();fog=m.fog||fog;cfg.open=m.open!==false;lib=m.lib||[];setMap(m.map);logs=m.log;
       if(!sel&&tokens.length)sel=(tokens.find(t=>t.o===me.name)||tokens[0]).id;quick();renderLog();draw()}
     else if(m.t==='full'){tokens=m.tokens.map(fix);tokens.forEach(setImg);if(!tokens.some(t=>t.id===sel))sel=null;quick();rerender();draw()}
     else if(m.t==='state'){const dl=drag&&tokens.find(k=>k.id===drag),keep=dl&&{x:dl.x,y:dl.y},old=Object.fromEntries(tokens.map(t=>[t.id,t.s]));
@@ -149,6 +189,10 @@ function connect(){
     else if(m.t==='combat'){combat=m.c;renderCombat()}
     else if(m.t==='fog'){fog=m.f;draw();renderLib()}
     else if(m.t==='cfg'){cfg.open=m.open;quick();rerender()}
+    else if(m.t==='docs'){docs=m.list;renderDocs()}
+    else if(m.t==='doc'){if(pendingDoc===m.id)showDoc(m)}
+    else if(m.t==='docshow'){if(!me.gm)openDoc(m.id)}
+    else if(m.t==='notice')alert(m.msg);
     else if(m.t==='map')setMap(m.data);
     else if(m.t==='roll'){const i=logs.findIndex(x=>x.id===m.r.id);if(i>=0)logs[i]=m.r;else logs.unshift(m.r);logs.length=Math.min(logs.length,40);renderLog()}
     else if(m.t==='who')$('who').textContent='Na mesa: '+m.list.join(', ')};
@@ -186,6 +230,8 @@ function drawToken(t){
   ctx.font='bold 10px Barlow,Georgia';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.8)';ctx.strokeText(t.n,x+S/2,y+S-15);ctx.fillStyle='#fff';ctx.fillText(t.n,x+S/2,y+S-15)}
 function draw(){
   const cs=getComputedStyle(document.documentElement),gm=me&&me.gm;
+  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=cs.getPropertyValue('--bg')||'#111';ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.setTransform(dpr*view.s,0,0,dpr*view.s,dpr*view.x,dpr*view.y);
   ctx.fillStyle=cs.getPropertyValue('--map');ctx.fillRect(0,0,W,H);
   if(mapImg)ctx.drawImage(mapImg,0,0,W,H);
   ctx.strokeStyle=cs.getPropertyValue('--grid');ctx.lineWidth=1;ctx.globalAlpha=mapImg?.5:1;ctx.beginPath();
@@ -200,22 +246,46 @@ function draw(){
       if(a>0){fctx.fillStyle='rgba(5,8,10,'+a.toFixed(2)+')';fctx.fillRect(i%COLS,(i/COLS)|0,1,1)}}
     ctx.imageSmoothingEnabled=true;ctx.drawImage(fogC,0,0,W,H)}
 }
-const pos=e=>{const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}};
+const pos=e=>{const r=cv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;return{x:(px-view.x)/view.s,y:(py-view.y)/view.s,px,py}};
 const cellOf=p=>({x:clamp(Math.floor(p.x/CELL),0,COLS-1),y:clamp(Math.floor(p.y/CELL),0,ROWS-1)});
 function hit(p){const gm=me&&me.gm,lit=fog.on&&!gm?computeLit():null;
   for(let i=tokens.length-1;i>=0;i--){const t=tokens[i];if(t.on===false)continue;const z=t.z||1;
     if(p.x>=t.x*CELL&&p.x<(t.x+z)*CELL&&p.y>=t.y*CELL&&p.y<(t.y+z)*CELL){if(lit&&t.pc===false&&!(lit[t.y*COLS+t.x]>=0))continue;return t}}return null}
 function paintAt(c){if(!paint)return;const i=c.y*COLS+c.x;if(paint.cells.has(i))return;paint.cells.add(i);const k=paint.kind==='wall'?'walls':'seen';fog[k]=setCh(fog[k],i,paint.v?'1':'0');draw()}
-cv.addEventListener('pointerdown',e=>{const p=pos(e),c=cellOf(p),gm=me&&me.gm;
+/* câmera: zoom (roda / pinça) e deslocamento */
+const wrapEl=$('wrap');
+function fitView(){const s=Math.min(cw/W,ch/H);view.s=s;view.x=(cw-W*s)/2;view.y=(ch-H*s)/2}
+function clampView(){const m=60;view.x=Math.min(cw-m,Math.max(m-W*view.s,view.x));view.y=Math.min(ch-m,Math.max(m-H*view.s,view.y))}
+function resize(){const r=wrapEl.getBoundingClientRect();if(r.width<50||r.height<50){cw=W;ch=H}else{cw=r.width;ch=r.height}
+  dpr=window.devicePixelRatio||1;cv.width=Math.round(cw*dpr);cv.height=Math.round(ch*dpr);if(!view.user)fitView();clampView();draw()}
+function zoomAt(f,px,py){const fit=Math.min(cw/W,ch/H),ns=Math.max(fit*.9,Math.min(4,view.s*f)),k=ns/view.s;view.x=px-(px-view.x)*k;view.y=py-(py-view.y)*k;view.s=ns;view.user=true;clampView();draw()}
+cv.addEventListener('wheel',e=>{e.preventDefault();const r=cv.getBoundingClientRect();zoomAt(e.deltaY<0?1.15:1/1.15,e.clientX-r.left,e.clientY-r.top)},{passive:false});
+$('zin').onclick=()=>zoomAt(1.3,cw/2,ch/2);$('zout').onclick=()=>zoomAt(1/1.3,cw/2,ch/2);$('zfit').onclick=()=>{view.user=false;fitView();draw()};
+cv.addEventListener('pointerdown',e=>{
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});try{cv.setPointerCapture(e.pointerId)}catch(_){}
+  if(ptrs.size===2){drag=null;paint=null;pan=null;const[a,b]=[...ptrs.values()],r=cv.getBoundingClientRect();
+    pinch={d:Math.hypot(a.x-b.x,a.y-b.y)||1,s:view.s,mx:(a.x+b.x)/2-r.left,my:(a.y+b.y)/2-r.top,vx:view.x,vy:view.y};return}
+  const p=pos(e),c=cellOf(p),gm=me&&me.gm;
   if(placing&&gm){tx({t:'place',...placing,x:c.x,y:c.y});placing=null;cv.style.cursor='';renderLib();return}
-  if(gm&&tool!=='move'){paint={kind:tool.startsWith('wall')?'wall':'seen',v:tool.endsWith('1')?1:0,cells:new Set()};cv.setPointerCapture(e.pointerId);paintAt(c);return}
-  const t=hit(p);sel=t?t.id:null;drag=t&&can(t)?t.id:null;if(drag){doff={x:c.x-t.x,y:c.y-t.y};cv.setPointerCapture(e.pointerId)}quick();renderLog();draw()});
+  if(gm&&tool!=='move'){paint={kind:tool.startsWith('wall')?'wall':'seen',v:tool.endsWith('1')?1:0,cells:new Set()};paintAt(c);return}
+  const t=hit(p);
+  if(t){sel=t.id;drag=can(t)?t.id:null;if(drag)doff={x:c.x-t.x,y:c.y-t.y};quick();renderLog();draw();return}
+  pan={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y,moved:false}});
 cv.addEventListener('dblclick',e=>{const t=hit(pos(e));if(t)openSheet(t.id)});
-cv.addEventListener('pointermove',e=>{const c=cellOf(pos(e));if(paint){paintAt(c);return}if(!drag)return;const t=tokens.find(k=>k.id===drag);if(!t)return;
+cv.addEventListener('pointermove',e=>{
+  if(ptrs.has(e.pointerId))ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pinch&&ptrs.size>=2){const[a,b]=[...ptrs.values()],r=cv.getBoundingClientRect(),d=Math.hypot(a.x-b.x,a.y-b.y)||1,fit=Math.min(cw/W,ch/H),
+      ns=Math.max(fit*.9,Math.min(4,pinch.s*d/pinch.d)),mx=(a.x+b.x)/2-r.left,my=(a.y+b.y)/2-r.top,k=ns/pinch.s;
+    view.s=ns;view.x=mx-(pinch.mx-pinch.vx)*k;view.y=my-(pinch.my-pinch.vy)*k;view.user=true;clampView();draw();return}
+  if(pan){const dx=e.clientX-pan.x,dy=e.clientY-pan.y;if(Math.hypot(dx,dy)>5)pan.moved=true;if(pan.moved){view.x=pan.vx+dx;view.y=pan.vy+dy;view.user=true;clampView();draw()}return}
+  const c=cellOf(pos(e));if(paint){paintAt(c);return}if(!drag)return;const t=tokens.find(k=>k.id===drag);if(!t)return;
   const z=t.z||1,nx=clamp(c.x-doff.x,0,COLS-z),ny=clamp(c.y-doff.y,0,ROWS-z);
   if(nx!==t.x||ny!==t.y){t.x=nx;t.y=ny;draw();const n=Date.now();if(n-lastMove>60){lastMove=n;tx({t:'move',id:t.id,x:nx,y:ny})}}});
-cv.addEventListener('pointerup',()=>{if(paint){tx({t:'fogop',op:'paint',kind:paint.kind,v:paint.v,cells:[...paint.cells]});paint=null;return}
-  const t=drag&&tokens.find(k=>k.id===drag);drag=null;if(t)tx({t:'move',id:t.id,x:t.x,y:t.y})});
+const up=e=>{ptrs.delete(e.pointerId);if(pinch){if(ptrs.size<2)pinch=null;return}
+  if(pan){const pn=pan;pan=null;if(!pn.moved){sel=null;quick();renderLog();draw()}return}
+  if(paint){tx({t:'fogop',op:'paint',kind:paint.kind,v:paint.v,cells:[...paint.cells]});paint=null;return}
+  const t=drag&&tokens.find(k=>k.id===drag);drag=null;if(t)tx({t:'move',id:t.id,x:t.x,y:t.y})};
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&placing){placing=null;cv.style.cursor='';renderLib()}});
 
 const patch=(t,f,now)=>{clearTimeout(ft);const go=()=>tx({t:'patch',id:t.id,f});now?go():ft=setTimeout(go,350)};
@@ -223,7 +293,7 @@ const pips=(cur,max,k,ed)=>Array.from({length:Math.min(max,40)},(_,i)=>`<i class
 
 /* ----- painel rápido (lateral) ----- */
 function quick(){
-  renderCombat();renderLib();const box=$('sel'),t=cur();
+  renderCombat();renderLib();renderMini();const box=$('sel'),t=cur();
   if(!t){box.innerHTML='<p class="mut">Clique num token para selecionar. Duplo clique abre a ficha.</p>';return}
   const s=t.s,ed=can(t);
   box.innerHTML=`<div class="row">${av(t,42)}<h2 style="margin:0">${esc(t.n)} <span class="mut" style="text-transform:none;letter-spacing:0">${esc(CLS[s.cl]||'')} ${esc(s.or)}</span></h2></div>
@@ -388,6 +458,49 @@ $('cbox').addEventListener('click',e=>{
 $('cbox').addEventListener('change',e=>{const d=e.target.dataset;
   if(d.cmode!==undefined)tx({t:'combat',op:'mode',v:e.target.value});
   else if(d.cpick)tx({t:'combat',op:'pick',id:d.cpick,ph:e.target.value===''?-2:+e.target.value})});
+/* ----- barra rápida do token (celular) ----- */
+function renderMini(){const el=$('mini'),t=cur();if(!el)return;if(!t||t.on===false||!me){el.hidden=true;return}
+  el.hidden=false;const ed=can(t);
+  el.innerHTML=`${av(t,36)}<div style="flex:1;min-width:0"><b>${esc(t.n)}</b><div class="bar"><i style="width:${Math.max(0,t.hp/t.max*100)}%"></i></div><small>PV ${t.hp}/${t.max} · PD ${t.s.pd[0]}/${t.s.pd[1]}</small></div>
+   <button class="g" data-m="-1"${ed?'':' disabled'}>−1</button><button class="g" data-m="1"${ed?'':' disabled'}>+1</button><button data-m="sheet">Ficha</button>`}
+$('mini').addEventListener('click',e=>{const b=e.target.closest('button'),t=cur();if(!b||!t)return;
+  if(b.dataset.m==='sheet'){openSheet(t.id);return}
+  if(can(t)){t.hp=clamp(t.hp+ +b.dataset.m,0,t.max);patch(t,{hp:t.hp},1);quick();draw()}});
+/* ----- abas (celular) ----- */
+function setMob(){const m=innerWidth<=820;document.body.classList.toggle('m',m);if(m&&!document.body.dataset.tab)document.body.dataset.tab='map';if(!m)delete document.body.dataset.tab;mob=m;resize()}
+$('tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;document.body.dataset.tab=b.dataset.tab;
+  [...$('tabs').children].forEach(x=>x.classList.toggle('on',x===b));if(b.dataset.tab==='map')setTimeout(resize,30);else window.scrollTo(0,0)});
+addEventListener('resize',setMob);if(window.ResizeObserver)new ResizeObserver(()=>resize()).observe(wrapEl);
+/* ----- documentos ----- */
+const fmtSize=n=>n>1048576?(n/1048576).toFixed(1)+' MB':n>1024?Math.round(n/1024)+' KB':'';
+function renderDocs(){
+  const el=$('docs');if(!el||!me)return;const gm=me.gm,a=document.activeElement;if(a&&el.contains(a)&&/INPUT|TEXTAREA/.test(a.tagName))return;
+  el.innerHTML=(gm?`<div class="row sm"><button id="dup">+ Enviar arquivo</button><span class="mut">PDF ou imagem, até 2,5 MB</span></div><input type="file" id="dfile" accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" hidden>
+   <details class="lib"><summary>+ Nota de texto</summary><input id="dnt" placeholder="Título" maxlength="80" style="width:100%;margin:6px 0"><textarea id="dnx" placeholder="Texto da nota (os jogadores leem na tela)" style="width:100%;min-height:90px" maxlength="30000"></textarea><div class="row"><button id="dns">Salvar nota</button></div></details>`:'')+
+  (docs.length?docs.map(d=>`<div class="li doc"><span class="ic">${d.note?'📝':d.mime==='application/pdf'?'📄':'🖼️'}</span><span><b>${esc(d.name)}</b> <small class="mut">${fmtSize(d.size)}${gm?(d.vis?' · visível':' · oculto'):''}</small></span>
+    <button data-dopen="${d.id}">Abrir</button>${gm?`<button class="g" data-dvis="${d.id}:${d.vis?0:1}">${d.vis?'Ocultar':'Liberar'}</button><button class="g" data-dshow="${d.id}">Mostrar a todos</button><button class="g" data-ddel="${d.id}">✕</button>`:''}</div>`).join(''):
+   '<p class="mut">Nenhum documento'+(gm?' ainda. Envie um arquivo ou crie uma nota.':' liberado pelo mestre ainda.')+'</p>')}
+$('docs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+  if(b.id==='dup')$('dfile').click();
+  else if(b.id==='dns'){const n=$('dnt').value.trim(),x=$('dnx').value;if(!n&&!x.trim())return;tx({t:'docnote',name:n||'Nota',text:x});$('dnt').value='';$('dnx').value=''}
+  else if(d.dopen)openDoc(d.dopen);
+  else if(d.dvis){const[i,v]=d.dvis.split(':');tx({t:'docvis',id:i,v:+v})}
+  else if(d.dshow)tx({t:'docshow',id:d.dshow});
+  else if(d.ddel){if(confirm('Excluir este documento?'))tx({t:'docdel',id:d.ddel})}});
+$('docs').addEventListener('change',e=>{if(e.target.id!=='dfile')return;const f=e.target.files[0];e.target.value='';if(!f)return;
+  if(f.size>2.5*1024*1024){alert('Arquivo grande demais (máximo 2,5 MB).');return}
+  const r=new FileReader();r.onload=()=>tx({t:'docup',name:f.name.replace(/\.[^.]+$/,''),data:r.result});r.readAsDataURL(f)});
+function openDoc(id){pendingDoc=id;tx({t:'docget',id})}
+let dUrl=null;
+function showDoc(m){
+  pendingDoc=null;$('dt').textContent=m.name;const db=$('db'),dl=$('dl');dl.hidden=true;if(dUrl){URL.revokeObjectURL(dUrl);dUrl=null}
+  $('dv').hidden=false;
+  if(m.text!==undefined){db.innerHTML='<div class="dtxt"></div>';db.firstChild.textContent=m.text;return}
+  if(m.mime.startsWith('image/')){db.innerHTML=`<img src="${m.data}" alt="">`;return}
+  db.innerHTML='<p class="mut">Carregando…</p>';
+  fetch(m.data).then(r=>r.blob()).then(b=>{dUrl=URL.createObjectURL(b);dl.href=dUrl;dl.hidden=false;dl.download=m.name+'.pdf';
+    db.innerHTML=`<iframe src="${dUrl}" title="${esc(m.name)}"></iframe>`}).catch(()=>{db.innerHTML='<p class="mut">Não foi possível exibir o arquivo.</p>'})}
+$('dx').onclick=()=>{$('dv').hidden=true;$('db').innerHTML=''};
 /* ----- biblioteca (mestre) + névoa ----- */
 function renderLib(){
   const el=$('lib');if(!el)return;if(!me||!me.gm){el.hidden=true;return}el.hidden=false;
@@ -413,7 +526,7 @@ $('lib').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)r
   else if(d.fogop){if(d.fogop==='clear'&&!confirm('Reiniciar a exploração? As áreas já vistas voltam a ficar escuras.'))return;tx({t:'fogop',op:d.fogop});return}
   renderLib()});
 $('lib').addEventListener('change',e=>{if(e.target.dataset.open!==undefined)tx({t:'open',v:e.target.checked})});
-connect();
+setMob();connect();
 </script>
 </body>
 </html>

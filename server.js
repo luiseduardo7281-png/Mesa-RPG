@@ -6,7 +6,7 @@ const { presets, STD, CREATURES } = require('./chars');
 const PORT = process.env.PORT || 3000;
 const GM_PASSWORD = process.env.GM_PASSWORD || 'mestre';
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
-const FILE = path.join(DATA_DIR, 'state.json');
+const FILE = path.join(DATA_DIR, 'state.json'), DOCS_DIR = path.join(DATA_DIR, 'docs');
 const COLS = 22, ROWS = 14, N = COLS * ROWS, VER = 4;
 const ATTR = { Acrobacia:0, Animais:2, Aptidão:1, Atletismo:0, Bruxaria:1, Crime:0, Disciplina:2, Enganação:2, Furtividade:0, Inspecionar:1, Intimidar:2, Intuição:2, Luta:0, Medicina:1, Ofício:1, Percepção:1, Persuasão:2, Pontaria:0, Sobrevivência:1, Vigor:0 };
 const STEPS = [4,6,8,10,12], FACES = [4,6,8,10,12,20], CL = ['executor','vigilante','analista'];
@@ -32,6 +32,7 @@ function cleanS(s) {
 let state = { ver: VER, tokens: presets().map(t => ({ ...t, s: cleanS(t.s) })), map: null, log: [], open: true };
 try { const d = JSON.parse(fs.readFileSync(FILE, 'utf8')); if (d.ver === VER) state = d; } catch (e) {}
 const norm = () => { state.tokens.forEach(t => { if (t.cb === undefined) t.cb = true; if (t.pc === undefined) t.pc = /^t[1-7]$/.test(t.id); });
+  state.docs = state.docs || [];
   state.fog = state.fog || { on: false, seen: '0'.repeat(N), walls: '0'.repeat(N) }; if (state.open === undefined) state.open = true;
   state.combat = state.combat || { on: false, round: 1, phase: 0, mode: 'perfil', pick: {}, done: {} }; };
 norm();
@@ -89,6 +90,9 @@ const online = () => [...wss.clients].filter(c => c.me).map(c => c.me.name + (c.
 const sendPresence = () => bcast({ t: 'who', list: online() });
 const canEdit = (ws, t) => t && (ws.me.gm || (t.o && t.o === ws.me.name) || (state.open && t.pc));
 const fogB = () => bcast({ t: 'fog', f: state.fog });
+const docOk = m => /^(application\/pdf|image\/(png|jpeg|webp|gif))$/.test(m);
+const docsFor = ws => state.docs.filter(d => ws.me.gm || d.vis).map(d => ({ id: d.id, name: d.name, mime: d.mime, size: d.size, vis: d.vis, note: d.text !== undefined }));
+const docsB = () => wss.clients.forEach(c => { if (c.me) send(c, { t: 'docs', list: docsFor(c) }); });
 // ---- luz e visão (mesma lógica no cliente): linha de visão por Bresenham, paredes bloqueiam ----
 function litCells(x, y, r, walls) {
   const out = [];
@@ -116,7 +120,7 @@ wss.on('connection', ws => {
       const gm = !!m.pw && m.pw === GM_PASSWORD;
       if (m.pw && !gm) return send(ws, { t: 'error', msg: 'Senha de mestre incorreta.' });
       ws.me = { name, gm };
-      send(ws, { t: 'init', me: ws.me, tokens: state.tokens, map: state.map, log: state.log, combat: state.combat, fog: state.fog, open: state.open, lib: CREATURES.map(c => ({ key: c.key, name: c.name, img: c.img, z: c.z, hp: c.hp })) });
+      send(ws, { t: 'init', me: ws.me, tokens: state.tokens, map: state.map, log: state.log, combat: state.combat, fog: state.fog, open: state.open, docs: docsFor(ws), lib: CREATURES.map(c => ({ key: c.key, name: c.name, img: c.img, z: c.z, hp: c.hp })) });
       return sendPresence();
     }
     if (!ws.me) return;
@@ -155,6 +159,20 @@ wss.on('connection', ws => {
         if (m.op === 'on') f.on = !!m.v; else if (m.op === 'clear') f.seen = '0'.repeat(N); else if (m.op === 'all') f.seen = '1'.repeat(N); else if (m.op === 'clearwalls') f.walls = '0'.repeat(N);
         else if (m.op === 'paint') { const k = m.kind === 'wall' ? 'walls' : 'seen', a = f[k].split(''); for (const i of (Array.isArray(m.cells) ? m.cells : []).slice(0, 400)) a[clamp(i, 0, N - 1)] = m.v ? '1' : '0'; f[k] = a.join(''); }
         else return; fogB(); recalc(); save(); break; }
+      case 'docup': { if (!gm) return;
+        const mm = /^data:([\w.+\-\/]+);base64,([A-Za-z0-9+\/=]+)$/.exec(String(m.data || ''));
+        if (!mm || !docOk(mm[1])) return send(ws, { t: 'notice', msg: 'Formato não suportado. Use PDF, PNG, JPG, WEBP ou GIF.' });
+        const buf = Buffer.from(mm[2], 'base64'); if (buf.length > 2.5 * 1024 * 1024) return send(ws, { t: 'notice', msg: 'Arquivo grande demais (máximo 2,5 MB).' });
+        const id = 'd' + Date.now().toString(36) + rd(99);
+        try { fs.mkdirSync(DOCS_DIR, { recursive: true }); fs.writeFileSync(path.join(DOCS_DIR, id), buf); } catch (e) { return send(ws, { t: 'notice', msg: 'Não consegui salvar o arquivo no servidor.' }); }
+        state.docs.push({ id, name: str(m.name, 80) || 'Documento', mime: mm[1], size: buf.length, vis: false }); docsB(); save(); break; }
+      case 'docnote': { if (!gm) return; state.docs.push({ id: 'd' + Date.now().toString(36) + rd(99), name: str(m.name, 80) || 'Nota', mime: 'text/plain', size: 0, vis: false, text: str(m.text, 30000) }); docsB(); save(); break; }
+      case 'docvis': { if (!gm) return; const d = state.docs.find(x => x.id === m.id); if (!d) return; d.vis = !!m.v; docsB(); save(); break; }
+      case 'docdel': { if (!gm) return; const d = state.docs.find(x => x.id === m.id); if (!d) return; state.docs = state.docs.filter(x => x !== d); try { fs.unlinkSync(path.join(DOCS_DIR, d.id)); } catch (e) {} docsB(); save(); break; }
+      case 'docget': { const d = state.docs.find(x => x.id === m.id); if (!d || !(gm || d.vis)) return;
+        if (d.text !== undefined) return send(ws, { t: 'doc', id: d.id, name: d.name, mime: d.mime, text: d.text });
+        try { const b = fs.readFileSync(path.join(DOCS_DIR, d.id)); send(ws, { t: 'doc', id: d.id, name: d.name, mime: d.mime, data: 'data:' + d.mime + ';base64,' + b.toString('base64') }); } catch (e) { send(ws, { t: 'notice', msg: 'Arquivo não encontrado no servidor (o disco pode ter sido apagado).' }); } break; }
+      case 'docshow': { if (!gm) return; const d = state.docs.find(x => x.id === m.id); if (!d) return; d.vis = true; docsB(); bcast({ t: 'docshow', id: d.id }); save(); break; }
       case 'img': { if (!canEdit(ws, t)) return;
         t.img = (typeof m.data === 'string' && m.data.startsWith('data:image/') && m.data.length < 450000) ? m.data : null;
         bcast({ t: 'img', id: t.id, data: t.img }); save(); break; }

@@ -26,6 +26,16 @@ persistente e defina `DATA_DIR` para a pasta do disco.
 - Os 7 personagens prontos já vêm carregados (Cormac, Rhiona, Rowan, Muirenn, Cavan, Malik, Sira).
   "Restaurar personagens" (mestre) volta tudo ao original.
 
+## Documentos
+Aba/painel "Documentos". Mestre: "+ Enviar arquivo" (PDF, PNG, JPG, WEBP ou GIF, até 2,5 MB) ou "+ Nota de texto".
+Cada documento começa oculto: "Liberar" mostra aos jogadores, "Mostrar a todos" abre na tela de todo mundo agora.
+Os arquivos ficam na pasta `data/docs` (no Render gratuito somem quando o serviço reinicia).
+
+## Celular
+Em telas estreitas aparece uma barra de abas (Mapa, Token, Combate, Rolagens, Docs e, para o mestre, Mestre).
+No mapa: um dedo arrasta o token ou move o mapa (se tocar no vazio), dois dedos fazem zoom (pinça); botões ＋ － ⤢ no canto.
+Ao tocar num token, uma barra rápida mostra PV, −1/+1 e "Ficha". A ficha abre em tela cheia.
+
 ## Colocar coisas no mapa (mestre)
 O mapa começa vazio. No painel lateral, "Colocar no mapa": escolha um personagem ou uma criatura do livro
 (Afogado, Aughisk, Cria da Floresta, Ellén Trechend) e clique no mapa. Criaturas podem ser colocadas várias vezes.
