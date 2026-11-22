@@ -31,8 +31,14 @@ function cleanS(s) {
 }
 let state = { ver: VER, tokens: presets().map(t => ({ ...t, s: cleanS(t.s) })), map: null, log: [], open: true };
 try { const d = JSON.parse(fs.readFileSync(FILE, 'utf8')); if (d.ver === VER) state = d; } catch (e) {}
-const norm = () => { state.tokens.forEach(t => { if (t.cb === undefined) t.cb = true; if (t.pc === undefined) t.pc = /^t[1-7]$/.test(t.id); });
+const norm = () => { state.tokens.forEach(t => { if (t.cb === undefined) t.cb = true; if (t.pc === undefined) t.pc = /^t[1-8]$/.test(t.id); });
   state.docs = state.docs || [];
+  // migração (mesas já em andamento): adiciona personagens novos e completa a ficha do Cormac sem apagar nada
+  const PR = presets(); PR.forEach(p => { if (!state.tokens.find(t => t.id === p.id)) state.tokens.push({ ...p, s: cleanS(p.s) }); });
+  const cm = state.tokens.find(t => t.id === 't1'), cp = PR.find(p => p.id === 't1');
+  if (cm && cm.s && cp && !cm.s.rl.length) { const c = cleanS(cp.s); cm.s.rl = c.rl; cm.s.ag = cm.s.ag || c.ag; cm.s.ds = cm.s.ds || c.ds; }
+  state.tokens.forEach(t => { if (t.id === 't1' && t.s && !t.s.ag) t.s.ag = 22; });
+  state.tokens.forEach(t => { const pp = PR.find(p => p.id === t.id); if (pp && t.s && !t.s.bio) t.s.bio = cleanS(pp.s).bio; });
   state.fog = state.fog || { on: false, seen: '0'.repeat(N), walls: '0'.repeat(N) }; if (state.open === undefined) state.open = true;
   state.combat = state.combat || { on: false, round: 1, phase: 0, mode: 'perfil', pick: {}, done: {} }; };
 norm();

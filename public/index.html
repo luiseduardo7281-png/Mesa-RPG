@@ -365,7 +365,7 @@ $('sel').addEventListener('click',e=>{const t=cur(),b=e.target.closest('button')
   if(b.dataset.claim!==undefined){tx({t:'claim',id:t.id,v:+b.dataset.claim});return}
   if(b.dataset.q){t.hp=clamp(t.hp+ +b.dataset.q.split(':')[1],0,t.max);patch(t,{hp:t.hp},1);quick();draw()}});
 $('sel').addEventListener('change',e=>{const t=cur();if(!t)return;const d=e.target.dataset;if(e.target.id==='ow')tx({t:'owner',id:t.id,o:e.target.value});else if(d.lr!==undefined)tx({t:'tok',id:t.id,lr:+e.target.value});else if(d.cbx!==undefined)tx({t:'combat',op:'cb',id:t.id,v:e.target.checked});else if(d.pcx!==undefined)tx({t:'combat',op:'pc',id:t.id,v:e.target.checked})});
-$('add').onclick=()=>tx({t:'add'});$('rst').onclick=()=>{if(confirm('Restaurar os 7 personagens prontos? Isso apaga as alterações e o histórico.'))tx({t:'reset'})};
+$('add').onclick=()=>tx({t:'add'});$('rst').onclick=()=>{if(confirm('Restaurar os personagens prontos? Isso apaga as alterações e o histórico.'))tx({t:'reset'})};
 $('mapb').onclick=()=>$('file').click();$('mapx').onclick=()=>tx({t:'map',data:null});
 $('file').onchange=()=>{const f=$('file').files[0];if(!f)return;const im=new Image();
   im.onload=()=>{const k=Math.min(1,1600/Math.max(im.width,im.height)),c=document.createElement('canvas');

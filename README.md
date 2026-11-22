@@ -23,7 +23,7 @@ persistente e defina `DATA_DIR` para a pasta do disco.
 - Duplo clique num token (ou "Abrir ficha completa") abre a ficha. Arraste para mover.
 - O mestre atribui cada token a um jogador (campo "Jogador" = nome com que ele entrou).
   Jogador só move/edita/rola os tokens atribuídos a ele.
-- Os 7 personagens prontos já vêm carregados (Cormac, Rhiona, Rowan, Muirenn, Cavan, Malik, Sira).
+- Os 8 personagens prontos já vêm carregados (Cormac, Rhiona, Rowan, Muirenn, Cavan, Malik, Sira, Sorcha).
   "Restaurar personagens" (mestre) volta tudo ao original.
 
 ## Criaturas e NPCs
