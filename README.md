@@ -1,4 +1,19 @@
-# Mesa de RPG – servidor próprio (Ordem Paranormal II – playtest)
+# Mesa de RPG – servidor próprio
+
+## Dois sistemas, duas mesas
+Ao entrar no site a pessoa escolhe o sistema: **Ordem Paranormal 2** ou **RPG Universus**.
+Cada sistema tem a sua própria mesa (mapa, personagens, névoa, documentos e histórico de rolagens),
+salva em arquivos separados (`state.json` e `state-universus.json`, pastas `docs` e `docs-universus`).
+A senha do mestre (`GM_PASSWORD`) é a mesma para os dois.
+
+- **Ordem Paranormal 2:** tudo como descrito abaixo. Jogadores não conseguem remover habilidades da ficha (só o mestre).
+- **RPG Universus:** mapa, tokens, névoa, documentos e ficha própria (informações base, atributos FOR/DES/VIG/INT/CAR/MAG,
+  34 perícias, habilidades por grupo, inventário com armas, Mods., magias e história). Personagem pronto: Kira.
+  Rolagem básica de d20: botão "Rolar" em atributos e perícias (d20 + atributo + pontos da perícia); dá para rolar 1 a 6 d20 e somar um bônus.
+  As regras completas do sistema ainda não foram implementadas.
+  O token da Kira é uma imagem provisória: troque pelo botão "Imagem do token…".
+
+# Ordem Paranormal II – playtest
 
 Mesa virtual com mapa, tokens, fichas completas e rolagens no servidor.
 

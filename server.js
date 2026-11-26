@@ -2,11 +2,12 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const { WebSocketServer } = require('ws');
 const { presets, STD, CREATURES } = require('./chars');
+const U = require('./universus');
 
 const PORT = process.env.PORT || 3000;
 const GM_PASSWORD = process.env.GM_PASSWORD || 'mestre';
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
-const FILE = path.join(DATA_DIR, 'state.json'), DOCS_DIR = path.join(DATA_DIR, 'docs');
+const SYSF = { ordem: { file: path.join(DATA_DIR, 'state.json'), docs: path.join(DATA_DIR, 'docs') }, universus: { file: path.join(DATA_DIR, 'state-universus.json'), docs: path.join(DATA_DIR, 'docs-universus') } };
 const COLS = 22, ROWS = 14, N = COLS * ROWS, VER = 4;
 const ATTR = { Acrobacia:0, Animais:2, Aptidão:1, Atletismo:0, Bruxaria:1, Crime:0, Disciplina:2, Enganação:2, Furtividade:0, Inspecionar:1, Intimidar:2, Intuição:2, Luta:0, Medicina:1, Ofício:1, Percepção:1, Persuasão:2, Pontaria:0, Sobrevivência:1, Vigor:0 };
 const STEPS = [4,6,8,10,12], FACES = [4,6,8,10,12,20], CL = ['executor','vigilante','analista'];
@@ -29,23 +30,56 @@ function cleanS(s) {
     bio: str(s.bio, 3000) };
   o.pd[0] = Math.min(o.pd[0], o.pd[1]); return o;
 }
-let state = { ver: VER, tokens: presets().map(t => ({ ...t, s: cleanS(t.s) })), map: null, log: [], open: true };
-try { const d = JSON.parse(fs.readFileSync(FILE, 'utf8')); if (d.ver === VER) state = d; } catch (e) {}
-const norm = () => { state.tokens.forEach(t => { if (t.cb === undefined) t.cb = true; if (t.pc === undefined) t.pc = /^t[1-8]$/.test(t.id); });
+// ---- RPG Universus: ficha-modelo ----
+function cleanU(s) {
+  if (!s || typeof s !== 'object') s = {};
+  const pr = a => { const m = clamp(a && a[1], 0, 99999); return [Math.min(clamp(a && a[0], 0, 99999), m), m]; };
+  return { idade: str(s.idade, 30), altura: str(s.altura, 30), gen: str(s.gen, 40), esp: str(s.esp, 60), cl: str(s.cl, 60), tal: str(s.tal, 60), deu: str(s.deu, 80), amb: str(s.amb, 200), link: str(s.link, 300),
+    lv: clamp(s.lv, 1, 999), san: pr(s.san), pe: pr(s.pe), pm: pr(s.pm), def: str(s.def, 120), esq: str(s.esq, 120), rd: str(s.rd, 200), mov: str(s.mov, 60), cred: clamp(s.cred, -999999, 9999999), pa: clamp(s.pa, 0, 9999),
+    at: [0, 1, 2, 3, 4, 5].map(i => clamp(s.at && s.at[i], -99, 999)),
+    sk: lst(s.sk, 60, x => ({ n: str(x.n, 60) || 'Perícia', a: str(x.a, 60), v: str(x.v, 80) })),
+    cap: str(s.cap, 20),
+    eq: lst(s.eq, 40, x => ({ n: str(x.n, 80), k: x.k === 'arma' ? 'arma' : 'item', dm: str(x.dm, 100), cr: str(x.cr, 40), tp: str(x.tp, 40), md: str(x.md, 80), t: str(x.t, 2500) })),
+    ab: lst(s.ab, 80, x => ({ g: clamp(x.g, 0, 5), n: str(x.n, 80), t: str(x.t, 3500) })),
+    mods: lst(s.mods, 40, x => ({ n: str(x.n, 80), t: str(x.t, 1200) })), modcap: str(s.modcap, 20),
+    mg: lst(s.mg, 40, x => ({ n: str(x.n, 80), tp: str(x.tp, 60), ex: str(x.ex, 60), al: str(x.al, 60), ta: str(x.ta, 60), du: str(x.du, 60), t: str(x.t, 2500) })), mgdt: str(s.mgdt, 20), mgnote: str(s.mgnote, 200),
+    bio: str(s.bio, 12000), frag: str(s.frag, 6000) };
+}
+// ---- duas mesas independentes: Ordem Paranormal 2 e RPG Universus ----
+let SYS = 'ordem', state = null;
+const TB = {};
+const use = k => { SYS = k; state = TB[k].state; };
+const cleanAny = s => SYS === 'universus' ? cleanU(s) : cleanS(s);
+const blankAny = () => SYS === 'universus' ? cleanU({ sk: U.SKU.map(([n, a]) => ({ n, a, v: '0' })) }) : blank();
+const presetsAny = () => SYS === 'universus' ? U.presets() : presets();
+const norm = () => {
+  const pcRe = SYS === 'universus' ? /^u\d+$/ : /^t[1-8]$/;
+  state.tokens.forEach(t => { if (t.cb === undefined) t.cb = true; if (t.pc === undefined) t.pc = pcRe.test(t.id); });
   state.docs = state.docs || [];
-  // migração (mesas já em andamento): adiciona personagens novos e completa a ficha do Cormac sem apagar nada
-  const PR = presets(); PR.forEach(p => { if (!state.tokens.find(t => t.id === p.id)) state.tokens.push({ ...p, s: cleanS(p.s) }); });
-  const cm = state.tokens.find(t => t.id === 't1'), cp = PR.find(p => p.id === 't1');
-  if (cm && cm.s && cp && !cm.s.rl.length) { const c = cleanS(cp.s); cm.s.rl = c.rl; cm.s.ag = cm.s.ag || c.ag; cm.s.ds = cm.s.ds || c.ds; }
-  state.tokens.forEach(t => { if (t.id === 't1' && t.s && !t.s.ag) t.s.ag = 22; });
-  state.tokens.forEach(t => { const pp = PR.find(p => p.id === t.id); if (pp && t.s && !t.s.bio) t.s.bio = cleanS(pp.s).bio; });
+  if (SYS === 'ordem') {
+    // migração (mesas já em andamento): adiciona personagens novos e completa fichas sem apagar nada
+    const PR = presets(); PR.forEach(p => { if (!state.tokens.find(t => t.id === p.id)) state.tokens.push({ ...p, s: cleanS(p.s) }); });
+    const cm = state.tokens.find(t => t.id === 't1'), cp = PR.find(p => p.id === 't1');
+    if (cm && cm.s && cp && !cm.s.rl.length) { const c = cleanS(cp.s); cm.s.rl = c.rl; cm.s.ag = cm.s.ag || c.ag; cm.s.ds = cm.s.ds || c.ds; }
+    state.tokens.forEach(t => { if (t.id === 't1' && t.s && !t.s.ag) t.s.ag = 22; });
+    state.tokens.forEach(t => { const pp = PR.find(p => p.id === t.id); if (pp && t.s && !t.s.bio) t.s.bio = cleanS(pp.s).bio; });
+  } else {
+    U.presets().forEach(p => { if (!state.tokens.find(t => t.id === p.id)) state.tokens.push({ ...p, s: cleanU(p.s) }); });
+  }
   state.fog = state.fog || { on: false, seen: '0'.repeat(N), walls: '0'.repeat(N) }; if (state.open === undefined) state.open = true;
-  state.combat = state.combat || { on: false, round: 1, phase: 0, mode: 'perfil', pick: {}, done: {} }; };
-norm();
-let seq = state.log.reduce((m, r) => Math.max(m, r.id || 0), 0);
-let saveT = null;
-function save() { clearTimeout(saveT); saveT = setTimeout(() => {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(FILE, JSON.stringify(state)); } catch (e) { console.error('save', e.message); } }, 800); }
+  state.combat = state.combat || { on: false, round: 1, phase: 0, mode: 'perfil', pick: {}, done: {} };
+};
+function loadTable(k) {
+  const fresh = k === 'universus' ? { ver: 1, tokens: U.presets().map(t => ({ ...t, s: cleanU(t.s) })), map: null, log: [], open: true }
+                                  : { ver: VER, tokens: presets().map(t => ({ ...t, s: cleanS(t.s) })), map: null, log: [], open: true };
+  let st = fresh;
+  try { const d = JSON.parse(fs.readFileSync(SYSF[k].file, 'utf8')); if (d.ver === fresh.ver) st = d; } catch (e) {}
+  TB[k] = { state: st, saveT: null }; use(k); norm();
+}
+loadTable('ordem'); loadTable('universus'); use('ordem');
+let seq = Object.values(TB).reduce((m, tb) => Math.max(m, tb.state.log.reduce((a, r) => Math.max(a, r.id || 0), 0)), 0);
+function save() { const k = SYS, tb = TB[k]; clearTimeout(tb.saveT); tb.saveT = setTimeout(() => {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(SYSF[k].file, JSON.stringify(tb.state)); } catch (e) { console.error('save', e.message); } }, 800); }
 
 // ---- rolagem (regras do livro) ----
 const rd = n => 1 + Math.floor(Math.random() * n);
@@ -95,19 +129,19 @@ const viewTok = (ws, t, full) => {
   if (!seesSheet(ws, t)) v = { ...v, s: undefined };
   return full ? v : light(v);
 };
-const liveClients = f => wss.clients.forEach(c => { if (c.me && c.readyState === 1) f(c); });
+const liveClients = f => wss.clients.forEach(c => { if (c.me && c.sys === SYS && c.readyState === 1) f(c); });
 const statB = except => liveClients(c => { if (c !== except) c.send(JSON.stringify({ t: 'state', tokens: state.tokens.map(t => viewTok(c, t, false)) })); });
 const fullB = () => liveClients(c => c.send(JSON.stringify({ t: 'full', tokens: state.tokens.map(t => viewTok(c, t, true)) })));
 const sheetB = t => liveClients(c => { if (seesSheet(c, t)) c.send(JSON.stringify({ t: 'sheet', id: t.id, s: t.s })); });
 const send = (ws, m) => ws.readyState === 1 && ws.send(JSON.stringify(m));
-const bcast = (m, except) => { const s = JSON.stringify(m); wss.clients.forEach(c => { if (c !== except && c.me && c.readyState === 1) c.send(s); }); };
-const online = () => [...wss.clients].filter(c => c.me).map(c => c.me.name + (c.me.gm ? ' (mestre)' : ''));
+const bcast = (m, except) => { const s = JSON.stringify(m); wss.clients.forEach(c => { if (c !== except && c.me && c.sys === SYS && c.readyState === 1) c.send(s); }); };
+const online = () => [...wss.clients].filter(c => c.me && c.sys === SYS).map(c => c.me.name + (c.me.gm ? ' (mestre)' : ''));
 const sendPresence = () => bcast({ t: 'who', list: online() });
 const canEdit = (ws, t) => t && (ws.me.gm || (t.o && t.o === ws.me.name) || (state.open && t.pc));
 const fogB = () => bcast({ t: 'fog', f: state.fog });
 const docOk = m => /^(application\/pdf|image\/(png|jpeg|webp|gif))$/.test(m);
 const docsFor = ws => state.docs.filter(d => ws.me.gm || d.vis).map(d => ({ id: d.id, name: d.name, mime: d.mime, size: d.size, vis: d.vis, note: d.text !== undefined }));
-const docsB = () => wss.clients.forEach(c => { if (c.me) send(c, { t: 'docs', list: docsFor(c) }); });
+const docsB = () => wss.clients.forEach(c => { if (c.me && c.sys === SYS) send(c, { t: 'docs', list: docsFor(c) }); });
 // ---- luz e visão (mesma lógica no cliente): linha de visão por Bresenham, paredes bloqueiam ----
 function litCells(x, y, r, walls) {
   const out = [];
@@ -134,11 +168,13 @@ wss.on('connection', ws => {
       const name = String(m.name || '').trim().slice(0, 20) || 'Jogador';
       const gm = !!m.pw && m.pw === GM_PASSWORD;
       if (m.pw && !gm) return send(ws, { t: 'error', msg: 'Senha de mestre incorreta.' });
+      const sys = SYSF[m.sys] ? m.sys : 'ordem'; use(sys); ws.sys = sys;
       ws.me = { name, gm };
-      send(ws, { t: 'init', me: ws.me, tokens: state.tokens.map(t => viewTok(ws, t, true)), map: state.map, log: state.log, combat: state.combat, fog: state.fog, open: state.open, docs: docsFor(ws), lib: CREATURES.map(c => ({ key: c.key, name: c.name, img: c.img, z: c.z, hp: c.hp })) });
+      send(ws, { t: 'init', me: ws.me, tokens: state.tokens.map(t => viewTok(ws, t, true)), map: state.map, log: state.log, combat: state.combat, fog: state.fog, open: state.open, docs: docsFor(ws), sys: SYS, lib: (SYS === 'universus' ? [] : CREATURES).map(c => ({ key: c.key, name: c.name, img: c.img, z: c.z, hp: c.hp })) });
       return sendPresence();
     }
     if (!ws.me) return;
+    use(ws.sys);
     const gm = ws.me.gm, t = state.tokens.find(k => k.id === m.id);
     const getLog = () => state.log.find(x => x.id === m.rid);
     switch (m.t) {
@@ -149,16 +185,18 @@ wss.on('connection', ws => {
         if ('c' in f && /^#[0-9a-f]{6}$/i.test(f.c)) t.c = f.c;
         if ('max' in f) t.max = Math.max(1, clamp(f.max, 1, 999)); if ('hp' in f) t.hp = clamp(f.hp, 0, 999);
         t.hp = Math.min(t.hp, t.max); statB();
-        if ('s' in f) { t.s = cleanS(f.s); sheetB(t); } save(); break; }
+        if ('s' in f) { const ns = cleanAny(f.s);
+          if (SYS === 'ordem' && !gm && ns.ab.length < t.s.ab.length) ns.ab = t.s.ab;   // jogadores não removem habilidades da ficha
+          t.s = ns; sheetB(t); } save(); break; }
       case 'add': if (!gm) return;
-        state.tokens.push({ id: 't' + Date.now().toString(36) + rd(99), n: 'Novo', sub: '', x: 1, y: 1, hp: 10, max: 10, c: '#c79a2b', o: '', cb: true, pc: false, on: true, z: 1, lr: 0, s: blank() });
+        state.tokens.push({ id: 't' + Date.now().toString(36) + rd(99), n: 'Novo', sub: '', x: 1, y: 1, hp: 10, max: 10, c: '#c79a2b', o: '', cb: true, pc: false, on: true, z: 1, lr: 0, s: blankAny() });
         if (state.tokens.length > 60) state.tokens.shift();
         fullB(); save(); break;
-      case 'reset': if (!gm) return; state.tokens = presets().map(x => ({ ...x, s: cleanS(x.s) })); state.log = []; state.combat = null; norm(); recalc();
+      case 'reset': if (!gm) return; state.tokens = presetsAny().map(x => ({ ...x, s: cleanAny(x.s) })); state.log = []; state.combat = null; norm(); recalc();
         fullB(); save(); break;
       case 'place': { if (!gm) return; const px = clamp(m.x, 0, COLS - 1), py = clamp(m.y, 0, ROWS - 1);
         if (m.kind === 'pc') { if (!t || !t.pc) return; t.on = true; t.x = Math.min(px, COLS - t.z); t.y = Math.min(py, ROWS - t.z); }
-        else { const c = CREATURES.find(k => k.key === m.key); if (!c) return; const same = state.tokens.filter(k => k.cr === c.key).length;
+        else { if (SYS !== 'ordem') return; const c = CREATURES.find(k => k.key === m.key); if (!c) return; const same = state.tokens.filter(k => k.cr === c.key).length;
           state.tokens.push({ id: 'c' + Date.now().toString(36) + rd(99), cr: c.key, n: c.name + (same ? ' ' + (same + 1) : ''), sub: '', x: Math.min(px, COLS - c.z), y: Math.min(py, ROWS - c.z),
             hp: c.hp, max: c.hp, c: '#555555', o: '', cb: true, pc: false, on: true, z: c.z, lr: 0, img: c.img, s: cleanS(c.s) }); }
         fullB(); recalc(); save(); break; }
@@ -179,19 +217,19 @@ wss.on('connection', ws => {
         if (!mm || !docOk(mm[1])) return send(ws, { t: 'notice', msg: 'Formato não suportado. Use PDF, PNG, JPG, WEBP ou GIF.' });
         const buf = Buffer.from(mm[2], 'base64'); if (buf.length > 2.5 * 1024 * 1024) return send(ws, { t: 'notice', msg: 'Arquivo grande demais (máximo 2,5 MB).' });
         const id = 'd' + Date.now().toString(36) + rd(99);
-        try { fs.mkdirSync(DOCS_DIR, { recursive: true }); fs.writeFileSync(path.join(DOCS_DIR, id), buf); } catch (e) { return send(ws, { t: 'notice', msg: 'Não consegui salvar o arquivo no servidor.' }); }
+        try { fs.mkdirSync(SYSF[SYS].docs, { recursive: true }); fs.writeFileSync(path.join(SYSF[SYS].docs, id), buf); } catch (e) { return send(ws, { t: 'notice', msg: 'Não consegui salvar o arquivo no servidor.' }); }
         state.docs.push({ id, name: str(m.name, 80) || 'Documento', mime: mm[1], size: buf.length, vis: false }); docsB(); save(); break; }
       case 'docnote': { if (!gm) return; state.docs.push({ id: 'd' + Date.now().toString(36) + rd(99), name: str(m.name, 80) || 'Nota', mime: 'text/plain', size: 0, vis: false, text: str(m.text, 30000) }); docsB(); save(); break; }
       case 'docvis': { if (!gm) return; const d = state.docs.find(x => x.id === m.id); if (!d) return; d.vis = !!m.v; docsB(); save(); break; }
-      case 'docdel': { if (!gm) return; const d = state.docs.find(x => x.id === m.id); if (!d) return; state.docs = state.docs.filter(x => x !== d); try { fs.unlinkSync(path.join(DOCS_DIR, d.id)); } catch (e) {} docsB(); save(); break; }
+      case 'docdel': { if (!gm) return; const d = state.docs.find(x => x.id === m.id); if (!d) return; state.docs = state.docs.filter(x => x !== d); try { fs.unlinkSync(path.join(SYSF[SYS].docs, d.id)); } catch (e) {} docsB(); save(); break; }
       case 'docget': { const d = state.docs.find(x => x.id === m.id); if (!d || !(gm || d.vis)) return;
         if (d.text !== undefined) return send(ws, { t: 'doc', id: d.id, name: d.name, mime: d.mime, text: d.text });
-        try { const b = fs.readFileSync(path.join(DOCS_DIR, d.id)); send(ws, { t: 'doc', id: d.id, name: d.name, mime: d.mime, data: 'data:' + d.mime + ';base64,' + b.toString('base64') }); } catch (e) { send(ws, { t: 'notice', msg: 'Arquivo não encontrado no servidor (o disco pode ter sido apagado).' }); } break; }
+        try { const b = fs.readFileSync(path.join(SYSF[SYS].docs, d.id)); send(ws, { t: 'doc', id: d.id, name: d.name, mime: d.mime, data: 'data:' + d.mime + ';base64,' + b.toString('base64') }); } catch (e) { send(ws, { t: 'notice', msg: 'Arquivo não encontrado no servidor (o disco pode ter sido apagado).' }); } break; }
       case 'docshow': { if (!gm) return; const d = state.docs.find(x => x.id === m.id); if (!d) return; d.vis = true; docsB(); bcast({ t: 'docshow', id: d.id }); save(); break; }
       case 'img': { if (!canEdit(ws, t)) return;
         t.img = (typeof m.data === 'string' && m.data.startsWith('data:image/') && m.data.length < 450000) ? m.data : null;
         bcast({ t: 'img', id: t.id, data: t.img }); save(); break; }
-      case 'combat': { const c = state.combat, op = m.op;
+      case 'combat': { if (SYS !== 'ordem') return; const c = state.combat, op = m.op;
         if (op === 'pick') { if (!canEdit(ws, t)) return; const v = clamp(m.ph, -2, 2); if (v === -2) delete c.pick[t.id]; else c.pick[t.id] = v; }
         else if (op === 'done') { if (!canEdit(ws, t)) return; c.done[t.id] = !c.done[t.id]; }
         else if (!gm) return;
@@ -211,20 +249,24 @@ wss.on('connection', ws => {
       case 'map': if (!gm) return;
         state.map = (typeof m.data === 'string' && m.data.startsWith('data:image/') && m.data.length < 3e6) ? m.data : null;
         bcast({ t: 'map', data: state.map }); save(); break;
-      case 'roll': { if (!canEdit(ws, t) || !t.s.sk.length) return;
+      case 'roll': { if (SYS !== 'ordem' || !canEdit(ws, t) || !t.s.sk.length) return;
         const r = rollTest(t, clamp(m.i, 0, t.s.sk.length - 1), { dt: clamp(m.dt, 1, 99) || 7, step: clamp(m.step, -2, 2), bonus: str(m.bonus, 4), pav: !!m.pav, w: m.w == null ? -1 : clamp(m.w, -1, 13) });
         r.by = ws.me.name; state.log.unshift(r); state.log.length = Math.min(state.log.length, 40);
         sheetB(t); bcast({ t: 'roll', r }); save(); break; }
-      case 'adj': { const r = getLog(); if (!r || !canEdit(ws, t) || t.s.cl !== 'analista' || t.s.an < 1 || r.tid !== t.id) return;   // Análise: ±1 em um dado
+      case 'uroll': { if (SYS !== 'universus' || !canEdit(ws, t)) return;   // RPG Universus: rolagem básica de d20 (regras completas ainda não enviadas)
+        const n = clamp(m.n, 1, 6), mod = clamp(m.mod, -999, 999), dice = Array.from({ length: n }, () => ({ f: 20, v: rd(20) })), vs = dice.map(d => d.v);
+        const r = { id: ++seq, u: 1, tid: t.id, n: t.n, p: str(m.label, 60) || 'Teste', dice, mod, hi: Math.max(...vs), sum: vs.reduce((a, b) => a + b, 0), by: ws.me.name };
+        state.log.unshift(r); state.log.length = Math.min(state.log.length, 40); bcast({ t: 'roll', r }); save(); break; }
+      case 'adj': { if (SYS !== 'ordem') return; const r = getLog(); if (!r || !canEdit(ws, t) || t.s.cl !== 'analista' || t.s.an < 1 || r.tid !== t.id) return;   // Análise: ±1 em um dado
         const d = r.dice[clamp(m.di, 0, r.dice.length - 1)], dir = m.dir > 0 ? 1 : -1;
         if (!d || d.v + dir < 1 || d.v + dir > d.f) return; d.v += dir; t.s.an--; finalize(r);
         sheetB(t); bcast({ t: 'roll', r, upd: 1 }); save(); break; }
-      case 'reroll': { const r = getLog(); if (!r || !canEdit(ws, t) || t.s.cl !== 'vigilante' || t.s.pd[0] < 2) return;      // Prontidão: 2 PD
+      case 'reroll': { if (SYS !== 'ordem') return; const r = getLog(); if (!r || !canEdit(ws, t) || t.s.cl !== 'vigilante' || t.s.pd[0] < 2) return;      // Prontidão: 2 PD
         const d = r.dice[clamp(m.di, 0, r.dice.length - 1)]; if (!d || d.v === 1) return;
         t.s.pd[0] -= 2; d.v = rd(d.f); finalize(r);
         sheetB(t); bcast({ t: 'roll', r, upd: 1 }); save(); break; }
     }
   });
-  ws.on('close', sendPresence);
+  ws.on('close', () => { if (ws.sys) { use(ws.sys); sendPresence(); } });
 });
 server.listen(PORT, () => console.log('Mesa de RPG em http://localhost:' + PORT + (process.env.GM_PASSWORD ? '' : '  (senha de mestre padrão: "mestre" – defina GM_PASSWORD!)')));
